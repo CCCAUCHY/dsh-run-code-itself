@@ -42,8 +42,6 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 {"code":"await tools.write(run_code_itself.write); return 1","description":"写 SVG","write":{"file_path":"out.svg","content":"<svg ...>...</svg>"}}
 ```
 
-每个字段保持小（几 KB）；大文档拆成多个字段或多次调用。
-
 ## 元编程
 
 `run_code_itself.code` 是当前程序的完整原文。程序可以读取它、按自己的标记切分，或对其中一段执行 `eval`，从一个模板动态生成并运行代码。注意被 eval 的内容必须是合法 JavaScript；模板及其数据最好放在额外字段里。
@@ -53,7 +51,7 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # 或 tgz：
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.1.4.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.1.6.tgz
 ```
 
 也可以在 **插件** 页面选择 **添加插件**，指向目录或 tgz。命令行只安装包；UI 的 **添加插件** 还会把 bundle 选进 profile（bundle 的补丁是空的，所以只影响插件页的显示）。

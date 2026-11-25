@@ -32,42 +32,31 @@ export const RUN_CODE_ITSELF = 'run_code_itself'
 const TICK = '\x60'
 const q = (text) => TICK + text + TICK
 
-/** One-line contract shown at the start of the run_code description. */
-const DATA_RULE = (
-  '**Data goes in extra fields:** pass payloads as JSON values in the top-level call and read them from @run_code_itself@; '
-  + 'do not inline JSON, nested tool arguments, or long text in @code@.'
+/** Note placed at the end of the description, next to the parameter schema. */
+const EXTRA_FIELDS_NOTE = (
+  'The parameter schema sets @additionalProperties: true@: you can pass any extra top-level fields. '
+  + 'Prefer them over inlining data in @code@ — writing JSON directly in an extra field avoids the escaping burden.'
 ).replaceAll('@', TICK)
 
-/** Model-facing contract for extra arguments, appended to run_code's description. */
+/** Model-facing contract for extra arguments, appended after the base description. */
 export const GUIDANCE = [
-  '',
   '**Extra fields are JSON**',
   '',
   'The whole @run_code@ call is one JSON object. Besides @code@ and @description@, you may add any extra top-level fields (for example @rows@, @regex@, @write@, @bash@). Their values are ordinary JSON values in that same object — arrays, objects, strings, numbers — written directly, not as a quoted JSON string. For @rows@, write [{"id": "AB-123-4567"}], not a string containing that JSON.',
   '',
+  'Why this is easier than inlining: inside @code@, a payload must be written as a JavaScript literal and then escaped again as part of the @code@ JSON string — two layers. An extra field has only the outer JSON layer; the program receives the parsed value directly. This matters most for JSON documents, arrays, nested tool arguments, quotes, newlines, and long text.',
+  '',
   'Inside the program, @run_code_itself@ is the complete argument object: @run_code_itself.code@ is the exact @code@ source, and every extra field is already parsed (@run_code_itself.rows@, @run_code_itself.write@). Do not declare it; do not call @JSON.parse@ on extra fields.',
   '',
-  '**Why this is easier than inlining**',
-  '',
-  'Inside @code@, a payload must be written as a JavaScript literal and then escaped again as part of the @code@ JSON string — two layers. An extra field has only the outer JSON layer; the program receives the parsed value directly. This matters most for JSON documents, arrays, nested tool arguments, quotes, newlines, and long text.',
+  'Prepare nested tool arguments the same way: put the subtool argument object in an extra field and pass it through, for example @tools.write(run_code_itself.write)@ or @tools.bash(run_code_itself.bash)@.',
   '',
   '**Metaprogramming**',
   '',
-  '@run_code_itself.code@ is the exact source of this program. A program can read it, split it at its own markers, or @eval@ a piece to generate code from a template. Keep the evaluated result valid JavaScript; extra fields are the easiest place to carry the template or its data.',
+  '@run_code_itself.code@ is the exact source of this program. A program can read it, split it at its own markers, or @eval@ a piece to generate code from a template. Extra fields are the easiest place to carry the template or its data.',
   '',
-  '**Prepare nested tool arguments as extra fields**',
+  'Example — data in extra fields, code generated and evaluated at runtime:',
   '',
-  'Put the subtool argument object in a field and pass it through:',
-  '',
-  '{"code":"await tools.write(run_code_itself.write); return 1","description":"Write the SVG","write":{"file_path":"out.svg","content":"<svg ...>...</svg>"}}',
-  '',
-  '{"code":"const r = await tools.bash(run_code_itself.bash); return r.stdout.text","description":"List files","bash":{"description":"List files","command":"ls -la"}}',
-  '',
-  'This keeps the nested JSON in the tool call instead of rebuilding and escaping it inside @code@.',
-  '',
-  '**Size**',
-  '',
-  'Keep each extra field small (a few KB). Do not put a complete large SVG/HTML/Markdown document in one field; split it into fields (for example @svgHead@, @svgBody@) or multiple calls, and let @code@ assemble it. Do not inline data in @code@ when it can live in an extra field.',
+  '{"code":"const t = run_code_itself.template; return await eval(\'(async () => {\' + t + \'})()\')","description":"Evaluate a template with data from extra fields","rows":[{"id":"AB-123-4567"},{"id":"ZZ-9999"}],"regex":"[0-9]{3}-[0-9]{4}","template":"return run_code_itself.rows.filter(row => new RegExp(run_code_itself.regex).test(row.id))"}',
 ].join('\n').replaceAll('@', TICK)
 
 /** True for the argument object shape a JSON tool call can produce. */
@@ -132,7 +121,7 @@ export class RunCodeItselfExecutor extends PtcExecutor {
         const code = isObjectRecord(properties.code) ? properties.code : undefined
         return {
           ...schema,
-          description: DATA_RULE + '\n\n' + schema.description + GUIDANCE,
+          description: schema.description + '\n\n' + EXTRA_FIELDS_NOTE + '\n\n' + GUIDANCE,
           parameters: {
             ...parameters,
             additionalProperties: true,

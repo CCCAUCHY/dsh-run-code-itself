@@ -44,8 +44,6 @@ Prepare nested tool arguments the same way:
 {"code":"await tools.write(run_code_itself.write); return 1","description":"Write the SVG","write":{"file_path":"out.svg","content":"<svg ...>...</svg>"}}
 ```
 
-Keep each field small (a few KB); split large documents or pass them in multiple calls.
-
 ## Metaprogramming
 
 `run_code_itself.code` is the exact source of the running program. A program can read it, split it at its own markers, or `eval` a piece to generate code from a template. Keep the evaluated result valid JavaScript; extra fields are the easiest place to carry the template or its data.
@@ -60,7 +58,7 @@ Keep each field small (a few KB); split large documents or pass them in multiple
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # or a packed tarball:
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.1.4.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.1.6.tgz
 ```
 
 Or use **Plugins → Add plugin** in the DSH Web UI and point it at the directory or tarball. The CLI only installs the package; the Web UI also selects the bundle (its patch is empty, so this only affects the Plugins listing).
