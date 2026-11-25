@@ -35,7 +35,7 @@ const q = (text) => TICK + text + TICK
 /** Note placed at the end of the description, next to the parameter schema. */
 const EXTRA_FIELDS_NOTE = (
   'The parameter schema sets @additionalProperties: true@: you can pass any extra top-level fields. '
-  + 'Prefer them over inlining data in @code@ — writing JSON directly in an extra field avoids the escaping burden.'
+  + 'Prefer them for data and nested tool arguments regardless of payload size — writing JSON directly in an extra field avoids the escaping burden.'
 ).replaceAll('@', TICK)
 
 /** Model-facing contract for extra arguments, appended after the base description. */
@@ -48,7 +48,7 @@ export const GUIDANCE = [
   '',
   'Inside the program, @run_code_itself@ is the complete argument object: @run_code_itself.code@ is the exact @code@ source, and every extra field is already parsed (@run_code_itself.rows@, @run_code_itself.write@). Do not declare it; do not call @JSON.parse@ on extra fields.',
   '',
-  'Prepare nested tool arguments the same way: put the subtool argument object in an extra field and pass it through, for example @tools.write(run_code_itself.write)@ or @tools.bash(run_code_itself.bash)@.',
+  'Apply this regardless of payload size: even a single path, command, regex, or small object belongs in an extra field when it is a subtool argument. Prepare every nested tool argument as an extra field and pass the object through, for example @tools.read(run_code_itself.read)@, @tools.bash(run_code_itself.bash)@, or @tools.write(run_code_itself.write)@. Do not write @tools.x({...})@ object literals inline in @code@.',
   '',
   '**Metaprogramming**',
   '',
@@ -56,7 +56,11 @@ export const GUIDANCE = [
   '',
   'Example — data in extra fields, code generated and evaluated at runtime:',
   '',
+  '@@@json',
+  '',
   '{"code":"const t = run_code_itself.template; return await eval(\'(async () => {\' + t + \'})()\')","description":"Evaluate a template with data from extra fields","rows":[{"id":"AB-123-4567"},{"id":"ZZ-9999"}],"regex":"[0-9]{3}-[0-9]{4}","template":"return run_code_itself.rows.filter(row => new RegExp(run_code_itself.regex).test(row.id))"}',
+  '',
+  '@@@',
 ].join('\n').replaceAll('@', TICK)
 
 /** True for the argument object shape a JSON tool call can produce. */

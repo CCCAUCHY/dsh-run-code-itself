@@ -34,7 +34,7 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 {"code":"return run_code_itself.rows.length","description":"数行数","rows":[{"id":"AB-123-4567"}]}
 ```
 
-同样的数据如果写在 `code` 里，需要先写成 JavaScript 字面量，再作为 `code` 字符串做一层转义；额外字段只有外层 JSON 一层，程序里直接拿到解析好的值。
+同样的数据如果写在 `code` 里，需要先写成 JavaScript 字面量，再作为 `code` 字符串做一层转义；额外字段只有外层 JSON 一层，程序里直接拿到解析好的值。无论载荷大小都适用：哪怕只是一个路径、命令、正则或小对象，只要它是子工具参数，就应放进额外字段。
 
 子工具的 JSON 也这样提前放好：
 
@@ -51,7 +51,7 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # 或 tgz：
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.1.6.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.1.7.tgz
 ```
 
 也可以在 **插件** 页面选择 **添加插件**，指向目录或 tgz。命令行只安装包；UI 的 **添加插件** 还会把 bundle 选进 profile（bundle 的补丁是空的，所以只影响插件页的显示）。

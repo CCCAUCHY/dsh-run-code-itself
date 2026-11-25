@@ -86,6 +86,8 @@ assert.ok(schema.description.includes('Why this is easier than inlining'))
 assert.ok(schema.parameters.properties.code.description.includes('Program logic only'))
 assert.ok(schema.parameters.properties.code.description.includes('metaprogramming'))
 assert.ok(schema.description.includes('**Metaprogramming**'))
+assert.ok(schema.description.includes('regardless of payload size'))
+assert.ok(schema.description.includes('```json'))
 console.log('schema: open parameters and guidance present')
 
 // --- the proposed metaprogramming example ---------------------------------

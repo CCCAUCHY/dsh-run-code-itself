@@ -38,10 +38,12 @@ Extra fields are values in the same JSON object as `code` — write them as JSON
 
 Inside `code`, the same payload needs a JavaScript literal and a second escaping layer for the `code` string. An extra field has only the outer JSON layer, and the program receives the parsed value directly.
 
+This applies regardless of payload size: even a single path, command, regex, or small object belongs in an extra field when it is a subtool argument.
+
 Prepare nested tool arguments the same way:
 
 ```json
-{"code":"await tools.write(run_code_itself.write); return 1","description":"Write the SVG","write":{"file_path":"out.svg","content":"<svg ...>...</svg>"}}
+{"code":"const r = await tools.bash(run_code_itself.bash); return r.stdout.text","description":"List files","bash":{"description":"List files","command":"ls -la"}}
 ```
 
 ## Metaprogramming
@@ -58,7 +60,7 @@ Prepare nested tool arguments the same way:
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # or a packed tarball:
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.1.6.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.1.7.tgz
 ```
 
 Or use **Plugins → Add plugin** in the DSH Web UI and point it at the directory or tarball. The CLI only installs the package; the Web UI also selects the bundle (its patch is empty, so this only affects the Plugins listing).
