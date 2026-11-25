@@ -46,7 +46,7 @@ Prepare nested tool arguments the same way:
 {"code":"const r = await tools.bash(run_code_itself.bash); return r.stdout.text","description":"List files","bash":{"description":"List files","command":"ls -la"}}
 ```
 
-## Templates and flat-field calls
+## Tool templates
 
 Every visible tool's argument template is preloaded in `run_code_templates`. Print one to inspect its keys, required fields, sample, and raw parameters:
 
@@ -54,17 +54,17 @@ Every visible tool's argument template is preloaded in `run_code_templates`. Pri
 {"code":"return run_code_templates.bash","description":"Read the bash template"}
 ```
 
-Call with flat `tool.key` sibling fields:
+Use the template's keys to build the nested sibling field; no extra syntax:
 
 ```json
-{"code":"return await tools.bash(run_code_call.bash)","description":"List files","bash.command":"ls -la","bash.description":"List files"}
+{"code":"return await tools.bash(run_code_itself.bash)","description":"List files","bash":{"command":"ls -la","description":"List files"}}
 ```
 
-`run_code_call.<tool>` is a preloaded variable, like `run_code_itself`: it holds the assembled argument object for every tool, built from the template, a nested object field, flat `tool.key` fields, and defaults. Call the real tool with it. A nested object such as `"bash": {...}` also works and flat fields take precedence per key.
+`run_code_templates` is a preloaded variable alongside `run_code_itself`.
 
 ## On-demand tool documentation
 
-The system prompt shows full definitions for the common tools (`bash`, `read`, `write`, `edit`, `glob`, `grep`) and a name/description index for all other visible tools. Every tool remains callable; for a hidden tool, print its template first, then call it with `run_code_call` or `tools.name`.
+The system prompt shows full definitions for the common tools (`bash`, `read`, `write`, `edit`, `glob`, `grep`) and a name/description index for all other visible tools. Every tool remains callable; for a hidden tool, print its template first, then call it with `tools.name` and a nested sibling field.
 
 ## Metaprogramming
 
@@ -80,7 +80,7 @@ The system prompt shows full definitions for the common tools (`bash`, `read`, `
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # or a packed tarball:
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.2.1.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.2.2.tgz
 ```
 
 Or use **Plugins → Add plugin** in the DSH Web UI and point it at the directory or tarball. The CLI only installs the package; the Web UI also selects the bundle (its patch is empty, so this only affects the Plugins listing).

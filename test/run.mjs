@@ -85,7 +85,8 @@ assert.ok(schema.description.includes('**Sibling fields — hard rules**'))
 assert.ok(schema.description.includes('Subtool JSON MUST be a sibling field'))
 assert.ok(schema.description.includes('regardless of payload size'))
 assert.ok(schema.description.includes('run_code_templates'))
-assert.ok(schema.description.includes('run_code_call'))
+assert.ok(schema.description.includes('**Preset variables**'))
+assert.ok(!schema.description.includes('run_code_call'))
 assert.ok(schema.parameters.properties.code.description.includes('Program logic only'))
 assert.ok(schema.parameters.properties.code.description.includes('metaprogramming'))
 console.log('schema: open parameters and guidance present')
@@ -249,7 +250,7 @@ console.log('')
   console.log('preset mount: enhanced executor registered in the preset scope')
   await scope.dispose()
 }
-// --- preloaded templates and flat-field calls ------------------------------
+// --- preloaded tool templates ----------------------------------------------
 {
   const bashSchema = {
     name: 'bash',
@@ -270,8 +271,6 @@ console.log('')
   assert.equal(templates.bash.sample.command, '')
   assert.equal(templates.bash.sample.timeoutMs, 0)
   assert.deepEqual(templates.bash.parameters.required, ['description', 'command'])
-  const calls = plugin.buildCalls(templates, { 'bash.command': 'ls -la', 'bash.description': 'List files' })
-  assert.deepEqual({ ...calls.bash }, { description: 'List files', command: 'ls -la' })
 
   const sdk = plugin.renderCompactSdk([bashSchema, { name: 'web_search', description: 'Search the web. Returns results.', parameters: {} }])
   assert.ok(sdk.includes('### Common tools'))
@@ -284,18 +283,18 @@ console.log('')
   executor.programs = programs
   const transport = executor.requirePtcTransport()
   await transport.execute({
-    code: 'return { keys: run_code_templates.bash.keys, call: run_code_call.bash }',
-    description: 'Template call test',
-    'bash.command': 'ls -la',
-    'bash.description': 'List files',
+    code: 'return { keys: run_code_templates.bash.keys, arg: run_code_itself.bash }',
+    description: 'Template test',
+    bash: { command: 'ls -la', description: 'List files' },
   }, toolExec())
   const program = programs.at(-1)
   assert.ok(program.includes('const run_code_templates = '))
-  assert.ok(program.includes('const run_code_call = '))
+  assert.ok(program.includes('const run_code_itself = '))
+  assert.ok(!program.includes('run_code_call'))
   const fn = new AsyncFunction(program)
   const value = await fn()
   assert.deepEqual(value.keys, ['description', 'command', 'timeoutMs'])
-  assert.deepEqual(value.call, { description: 'List files', command: 'ls -la' })
-  console.log('templates: preloaded and flat-field call resolved')
+  assert.deepEqual(value.arg, { command: 'ls -la', description: 'List files' })
+  console.log('templates: preloaded; only run_code_itself and run_code_templates')
 }
 console.log('All checks passed')

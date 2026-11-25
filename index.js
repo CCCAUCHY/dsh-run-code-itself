@@ -1,6 +1,6 @@
 /**
  * run_code_itself: expose the complete run_code tool-call arguments to the
- * program, with preloaded subtool templates and a flat-field call helper.
+ * program, with preloaded subtool templates.
  * @module
  */
 import { PtcExecutor } from '@deepseek-ai/dsh-tool-executor-ptc'
@@ -40,21 +40,23 @@ const EXTRA_FIELDS_NOTE = (
 
 /** Model-facing contract appended after the base description. */
 export const GUIDANCE = [
+  '**Preset variables**',
+  '',
+  '@run_code_itself@ is the complete arguments object of this @run_code@ call; extra sibling fields are already parsed JavaScript values. @run_code_templates@ contains every visible tool argument template; print @run_code_templates.<tool>@ for keys, required fields, and a sample.',
+  '',
   '**Sibling fields — hard rules**',
   '',
-  'The complete arguments of this @run_code@ call are available as @run_code_itself@; extra sibling fields are already parsed JavaScript values.',
-  '',
-  "1. **Subtool JSON MUST be a sibling field.** Put the argument values in a field named after the tool (@bash@, @read@, @write@, ...): a nested object (@bash: {...}@) or flat @bash.key@ fields. The preloaded @run_code_call@ variable exposes the assembled object for every tool: call @tools.bash(run_code_call.bash)@. Never write @tools.x({...})@ inline, regardless of payload size.",
+  '1. **Subtool JSON MUST be a sibling field.** Put the argument object in a field named after the tool (@bash@, @read@, @write@, ...) and call @tools.bash(run_code_itself.bash)@. Never write @tools.x({...})@ inline, regardless of payload size.',
   '2. **Values that need escaping MUST be sibling fields:** multi-line text, regex or paths with backslashes, JSON arrays/objects, templates.',
   '3. **Other values:** use a sibling field when it reduces escaping or is long; simple literals, numbers, status strings, and control flow stay in @code@.',
   '',
-  'Do not @JSON.stringify@ or @JSON.parse@ sibling values; do not declare @run_code_itself@.',
+  'Do not @JSON.stringify@ or @JSON.parse@ sibling values; do not declare the preset variables.',
   '',
   '**Metaprogramming**',
   '',
-  '@run_code_itself.code@ is the exact source; read, split, or @eval@ it. All tool templates are preloaded in @run_code_templates@; print @run_code_templates.<tool>@ for keys and samples.',
+  '@run_code_itself.code@ is the exact source; read, split, or @eval@ it. Use @run_code_templates@ to look up tool arguments.',
   '',
-  'Example: {"code":"return await tools.bash(run_code_call.bash)","description":"List files","bash.command":"ls -la","bash.description":"List files"}',
+  'Example: {"code":"return await tools.bash(run_code_itself.bash)","description":"List files","bash":{"command":"ls -la","description":"List files"}}',
 ].join('\n').replaceAll('@', TICK)
 
 /** True for the argument object shape a JSON tool call can produce. */
@@ -160,43 +162,15 @@ export function renderCompactSdk(tools) {
     '',
     '### Calling',
     '',
-    '- Put subtool JSON in a sibling field (bash, read, ...), nested or flat tool.key fields. run_code_call.<tool> is the assembled argument object: call tools.bash(run_code_call.bash).',
-    '- For flat fields, use tool.key names: {"bash.command":"ls -la","bash.description":"List files"} populates run_code_call.bash.',
-    '- run_code_templates and run_code_call are preloaded; no import.',
+    '- Put subtool JSON in a sibling field (bash, read, ...) and call tools.bash(run_code_itself.bash).',
+    '- run_code_templates is preloaded; print run_code_templates.<tool> for argument keys and samples.',
+    '- run_code_itself contains the complete call arguments.',
   )
   return lines.join('\n')
 }
 
 /**
- * Build the preloaded run_code_call map: one assembled argument object per
- * visible tool, from nested sibling fields and flat name.key fields.
- * @param templates - templates returned by buildTemplates.
- * @param args - the complete run_code arguments.
- * @returns one argument object per tool.
- */
-export function buildCalls(templates, args) {
-  const calls = Object.create(null)
-  for (const name of Object.keys(templates)) {
-    const template = templates[name]
-    const nested = isObjectRecord(args[name]) ? args[name] : undefined
-    const call = Object.create(null)
-    if (nested !== undefined) {
-      for (const key of Object.keys(nested)) call[key] = nested[key]
-    }
-    for (const key of template.keys) {
-      const flat = name + '.' + key
-      if (Object.prototype.hasOwnProperty.call(args, flat)) call[key] = args[flat]
-      else if (!Object.prototype.hasOwnProperty.call(call, key)
-        && template.defaults !== undefined
-        && Object.prototype.hasOwnProperty.call(template.defaults, key)) call[key] = template.defaults[key]
-    }
-    calls[name] = call
-  }
-  return calls
-}
-
-/**
- * The run_code transport with injected arguments, templates, and call helper.
+ * The run_code transport with injected arguments and tool templates.
  * Everything else (validation, presentation, live schema getters, output
  * rendering) stays owned by the wrapped transport.
  */
@@ -278,7 +252,7 @@ export class RunCodeItselfExecutor extends PtcExecutor {
   }
 
   /**
-   * Inject run_code_itself, all tool templates, and the flat-field call helper.
+   * Inject run_code_itself and all tool templates.
    * @param transport - the unwrapped run_code definition.
    * @param args - parsed model arguments, possibly with sibling fields.
    * @param exec - the tool run context.
@@ -290,7 +264,6 @@ export class RunCodeItselfExecutor extends PtcExecutor {
     const prelude = [
       'const run_code_templates = ' + jsonLiteral(templates) + ';',
       declarationFor(args),
-      'const run_code_call = ' + jsonLiteral(buildCalls(templates, args)) + ';',
     ].join('\n')
     return transport.execute({ ...args, code: prelude + '\n' + args.code }, exec)
   }
