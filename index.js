@@ -3,7 +3,7 @@
  * program, with preloaded subtool templates.
  * @module
  */
-import { PtcExecutor } from '@deepseek-ai/dsh-tool-executor-ptc'
+import { jsonSchemaToTs, PtcExecutor } from '@deepseek-ai/dsh-tool-executor-ptc'
 import { RUN_CODE_NAME } from '@deepseek-ai/dsh-tools'
 import { scopeOf } from '@deepseek-ai/dsh-scope'
 import z from '@deepseek-ai/schemastery'
@@ -42,7 +42,7 @@ const EXTRA_FIELDS_NOTE = (
 export const GUIDANCE = [
   '**Preset variables**',
   '',
-  '@run_code_itself@ is the complete arguments object of this @run_code@ call; extra sibling fields are already parsed JavaScript values. @run_code_templates@ contains every visible tool argument template; print @run_code_templates.<tool>@ for keys, required fields, and a sample.',
+  '@run_code_itself@ is the complete arguments object of this @run_code@ call; extra sibling fields are already parsed JavaScript values. @run_code_templates@ contains every visible tool template; print @run_code_templates.<tool>@ for its description, signature, parameters, output, and sample.',
   '',
   '**Sibling fields — hard rules**',
   '',
@@ -96,15 +96,24 @@ function sampleValue(property) {
   }
 }
 
+/** TypeScript call signature for one tool definition. */
+function signatureFor(definition) {
+  const parameters = isObjectRecord(definition.parameters) ? definition.parameters : { type: 'object', properties: {} }
+  const output = definition.output !== undefined && isObjectRecord(definition.output.schema)
+    ? definition.output.schema : {}
+  return 'tools.' + definition.name + '(args: ' + jsonSchemaToTs(parameters) + '): Promise<' + jsonSchemaToTs(output) + '>'
+}
+
 /**
- * Build one argument template per visible tool from its projected schema.
- * @param schemas - visible tool schemas.
+ * Build one argument template per visible tool, including its description,
+ * call signature, parameter schema, and output schema.
+ * @param definitions - visible tool definitions.
  * @returns templates keyed by tool name.
  */
-export function buildTemplates(schemas) {
+export function buildTemplates(definitions) {
   const templates = Object.create(null)
-  for (const schema of schemas) {
-    const parameters = isObjectRecord(schema.parameters) ? schema.parameters : {}
+  for (const definition of definitions) {
+    const parameters = isObjectRecord(definition.parameters) ? definition.parameters : {}
     const properties = isObjectRecord(parameters.properties) ? parameters.properties : {}
     const keys = Object.keys(properties)
     const required = Array.isArray(parameters.required) ? parameters.required.slice() : []
@@ -116,15 +125,18 @@ export function buildTemplates(schemas) {
       sample[key] = sampleValue(property)
       if (Object.prototype.hasOwnProperty.call(property, 'default')) defaults[key] = property.default
     }
+    const output = definition.output === undefined ? undefined : definition.output.schema
     const template = {
-      description: schema.description === undefined ? '' : String(schema.description),
+      description: definition.description === undefined ? '' : String(definition.description),
+      signature: signatureFor(definition),
       keys,
       required,
       sample,
       parameters,
     }
+    if (output !== undefined) template.output = output
     if (Object.keys(defaults).length > 0) template.defaults = defaults
-    templates[schema.name] = template
+    templates[definition.name] = template
   }
   return templates
 }
@@ -148,13 +160,21 @@ export function renderCompactSdk(tools) {
   const lines = [
     '## Tools',
     '',
-    'All tools are callable as await tools.name(args). All argument templates are preloaded in run_code_templates; print one with console.log(run_code_templates.<tool>) when you need its keys, required fields, or sample.',
+    'All tools are callable as await tools.name(args). All argument templates are preloaded in run_code_templates; print one with console.log(run_code_templates.<tool>) when you need its description, signature, parameters, output, or sample.',
+    '',
+    'type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue }',
     '',
     '### Common tools (full definitions)',
     '',
   ]
   for (const tool of common) {
-    lines.push(JSON.stringify({ name: tool.name, description: tool.description, parameters: tool.parameters }))
+    lines.push(JSON.stringify({
+      name: tool.name,
+      description: tool.description,
+      signature: signatureFor(tool),
+      parameters: tool.parameters,
+      output: tool.output === undefined ? undefined : tool.output.schema,
+    }))
   }
   lines.push('', '### Other tools (name, description; print the template for parameters)', '')
   for (const tool of other) lines.push('- ' + tool.name + ': ' + firstSentence(tool.description))

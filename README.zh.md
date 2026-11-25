@@ -44,7 +44,7 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 
 ## 工具模板
 
-所有可见工具的实参模板都预加载在 `run_code_templates` 里。打印其中一个即可查看键名、必填项、示例和原始参数：
+所有可见工具的模板都预加载在 `run_code_templates` 里，包含工具描述、TypeScript 调用签名、参数 schema（含每个参数的说明）、输出 schema、键名、必填项和示例。打印其中一个：
 
 ```json
 {"code":"return run_code_templates.bash","description":"查看 bash 模板"}
@@ -60,7 +60,7 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 
 ## 按需工具文档
 
-系统提示词里只展开常用工具（`bash`、`read`、`write`、`edit`、`glob`、`grep`）的完整定义，其余可见工具只列名字和一句话描述。所有工具仍然可调用；对未展开的工具，先打印它的模板，再用 `tools.name` 和嵌套兄弟字段调用。
+系统提示词里只展开常用工具（`bash`、`read`、`write`、`edit`、`glob`、`grep`）的完整定义，其余可见工具只列名字和一句话描述。所有工具仍然可调用；对未展开的工具，先打印模板拿到签名、参数和输出，再用 `tools.name` 和嵌套兄弟字段调用。
 
 ## 元编程
 
@@ -71,7 +71,7 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # 或 tgz：
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.2.2.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.2.3.tgz
 ```
 
 也可以在 **插件** 页面选择 **添加插件**，指向目录或 tgz。命令行只安装包；UI 的 **添加插件** 还会把 bundle 选进 profile（bundle 的补丁是空的，所以只影响插件页的显示）。

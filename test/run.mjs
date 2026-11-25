@@ -265,20 +265,37 @@ console.log('')
       required: ['description', 'command'],
     },
   }
-  const templates = plugin.buildTemplates([bashSchema])
+  const bashDefinition = {
+    ...bashSchema,
+    output: {
+      schema: {
+        type: 'object',
+        properties: {
+          stdout: { type: 'object', properties: { text: { type: 'string' } } },
+          exitCode: { type: 'number' },
+        },
+      },
+    },
+  }
+  const templates = plugin.buildTemplates([bashDefinition])
   assert.deepEqual(templates.bash.keys, ['description', 'command', 'timeoutMs'])
   assert.deepEqual(templates.bash.required, ['description', 'command'])
   assert.equal(templates.bash.sample.command, '')
   assert.equal(templates.bash.sample.timeoutMs, 0)
   assert.deepEqual(templates.bash.parameters.required, ['description', 'command'])
+  assert.ok(templates.bash.signature.startsWith('tools.bash(args: '))
+  assert.ok(templates.bash.signature.includes('Promise<'))
+  assert.equal(templates.bash.output.properties.exitCode.type, 'number')
 
-  const sdk = plugin.renderCompactSdk([bashSchema, { name: 'web_search', description: 'Search the web. Returns results.', parameters: {} }])
+  const webDefinition = { name: 'web_search', description: 'Search the web. Returns results.', parameters: {}, output: { schema: {} } }
+  const sdk = plugin.renderCompactSdk([bashDefinition, webDefinition])
   assert.ok(sdk.includes('### Common tools'))
   assert.ok(sdk.includes('web_search: Search the web.'))
   assert.ok(sdk.includes('run_code_templates'))
 
   const { ctx, programs, tools } = harness()
   tools.schemas = () => [bashSchema]
+  tools.definitions = () => [bashDefinition]
   const executor = new plugin.RunCodeItselfExecutor(ctx, {})
   executor.programs = programs
   const transport = executor.requirePtcTransport()
