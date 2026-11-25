@@ -1,7 +1,6 @@
 /**
  * run_code_itself: expose the complete run_code tool-call arguments to the
- * program as a preset variable, so structured payloads never have to be
- * escaped into the code string.
+ * program, with preloaded subtool templates and a flat-field call helper.
  * @module
  */
 import { PtcExecutor } from '@deepseek-ai/dsh-tool-executor-ptc'
@@ -30,58 +29,32 @@ export const RUN_CODE_ITSELF = 'run_code_itself'
 
 /** Backtick, kept as a code point so this file needs no template literals. */
 const TICK = '\x60'
-const q = (text) => TICK + text + TICK
 
-/** Note placed at the end of the description, next to the parameter schema. */
+/** Tools whose full definitions stay in the system prompt. */
+const COMMON_TOOLS = new Set(['bash', 'read', 'write', 'edit', 'glob', 'grep'])
+
+/** One-line note placed immediately after the base description. */
 const EXTRA_FIELDS_NOTE = (
-  'The parameter schema sets @additionalProperties: true@: extra sibling fields are allowed. '
-  + 'Prefer them for subtool arguments and escape-prone data, regardless of payload size — writing JSON directly in a sibling field avoids the escaping burden.'
+  'The parameter schema sets @additionalProperties: true@: extra sibling fields are allowed and MUST be used for subtool JSON and escape-prone values.'
 ).replaceAll('@', TICK)
 
-/** Model-facing contract for extra arguments, appended after the base description. */
+/** Model-facing contract appended after the base description. */
 export const GUIDANCE = [
-  '**Passing data and subtool arguments**',
+  '**Sibling fields — hard rules**',
   '',
-  'The complete arguments object of this @run_code@ call is available inside the program as @run_code_itself@. Any extra sibling fields you add to the JSON arguments become parsed JavaScript values on @run_code_itself.<field>@.',
+  'The complete arguments of this @run_code@ call are available as @run_code_itself@; extra sibling fields are already parsed JavaScript values.',
   '',
-  '**Put in extra sibling fields**',
+  "1. **Subtool JSON MUST be a sibling field.** Put the whole argument object in a field named after the tool (@bash@, @read@, @write@, ...) and forward it with @run_code_call('bash', run_code_itself)@ or @tools.bash(run_code_itself.bash)@. Never write @tools.x({...})@ inline, regardless of payload size.",
+  '2. **Values that need escaping MUST be sibling fields:** multi-line text, regex or paths with backslashes, JSON arrays/objects, templates.',
+  '3. **Other values:** use a sibling field when it reduces escaping or is long; simple literals, numbers, status strings, and control flow stay in @code@.',
   '',
-  '- **Subtool argument objects**: pass the whole object as a sibling field and forward it — @await tools.bash(run_code_itself.bash)@, @await tools.read(run_code_itself.read)@. Do this for every subtool call, regardless of payload size.',
-  '- **Escape-prone or structured data**: multi-line text, regex with backslashes, paths, JSON arrays and objects, templates. Values are ordinary JSON values in the same call object, not stringified JSON.',
-  '',
-  '**Keep in @code@ directly**',
-  '',
-  '- Control flow, loop bounds, simple numbers, short status strings, and inline logic (@for (let i = 0; i < 3; i++)@, @status === "ok"@).',
-  '',
-  'Why this is easier than inlining: inside @code@, a payload needs a JavaScript literal and then a second escaping layer for the @code@ string. A sibling field has only the outer JSON layer, and the program receives the parsed value directly. Do not call @JSON.parse@ on extra fields; do not declare @run_code_itself@.',
-  '',
-  '**Good — subtool arguments in a sibling field:**',
-  '',
-  '@@@json',
-  '',
-  '{"code":"const res = await tools.bash(run_code_itself.bash); return res.stdout.text;","description":"Read the last app log lines","bash":{"command":"tail -n 5 /var/log/app.log"}}',
-  '',
-  '@@@',
-  '',
-  '**Good — data used by code:**',
-  '',
-  '@@@json',
-  '',
-  '{"code":"const { rows, regex } = run_code_itself; return rows.filter(row => new RegExp(regex).test(row.id));","description":"Filter rows by id pattern","regex":"[0-9]{3}-[0-9]{4}","rows":[{"id":"AB-123-4567"},{"id":"ZZ-9999"}]}',
-  '',
-  '@@@',
+  'Do not @JSON.stringify@ or @JSON.parse@ sibling values; do not declare @run_code_itself@.',
   '',
   '**Metaprogramming**',
   '',
-  '@run_code_itself.code@ is the exact source of this program. A program can read it, split it at its own markers, or @eval@ a piece to generate code from a template. Extra fields are the easiest place to carry the template or its data.',
+  '@run_code_itself.code@ is the exact source; read, split, or @eval@ it. All tool templates are preloaded in @run_code_templates@; print @run_code_templates.<tool>@ for keys and samples.',
   '',
-  'Example — data in extra fields, code generated and evaluated at runtime:',
-  '',
-  '@@@json',
-  '',
-  '{"code":"const t = run_code_itself.template; return await eval(t)","description":"Evaluate a code template with data from extra fields","rows":[{"id":"AB-123-4567"},{"id":"ZZ-9999"}],"regex":"[0-9]{3}-[0-9]{4}","template":"(async () => run_code_itself.rows.filter(row => new RegExp(run_code_itself.regex).test(row.id)))()"}',
-  '',
-  '@@@',
+  'Example: {"code":"return await tools.bash(run_code_itself.bash)","description":"List files","bash":{"command":"ls -la","description":"List files"}}',
 ].join('\n').replaceAll('@', TICK)
 
 /** True for the argument object shape a JSON tool call can produce. */
@@ -89,33 +62,169 @@ function isObjectRecord(value) {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-/**
- * Build the one declaration that binds the program variable to the exact
- * arguments the model passed. The JSON text is valid JavaScript except for the
- * two line-separator code points, and object literals would give a __proto__
- * key prototype semantics, so that rare shape round-trips through JSON.parse.
- * @param payload - the parsed run_code arguments.
- * @returns one 'const run_code_itself = <literal>;' line.
- */
-export function declarationFor(payload) {
-  const json = JSON.stringify(payload)
+/** JSON text safe to embed as a JavaScript expression. */
+function jsonLiteral(value) {
+  const json = JSON.stringify(value)
   const safe = json.replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029')
-  const literal = safe.includes('"__proto__"') ? 'JSON.parse(' + JSON.stringify(safe) + ')' : safe
-  return 'const ' + RUN_CODE_ITSELF + ' = ' + literal + ';'
+  return safe.includes('"__proto__"') ? 'JSON.parse(' + JSON.stringify(safe) + ')' : safe
 }
 
 /**
- * The run_code transport with the injected arguments declaration. Everything
- * else (validation, presentation, live schema getters, output rendering) stays
- * owned by the wrapped transport.
+ * Build the one declaration that binds the program variable to the exact
+ * arguments the model passed.
+ * @param payload - the parsed run_code arguments.
+ * @returns one declaration statement.
+ */
+export function declarationFor(payload) {
+  return 'const ' + RUN_CODE_ITSELF + ' = ' + jsonLiteral(payload) + ';'
+}
+
+/** Placeholder value for one JSON Schema property. */
+function sampleValue(property) {
+  if (Object.prototype.hasOwnProperty.call(property, 'const')) return property.const
+  if (Array.isArray(property.enum) && property.enum.length > 0) return property.enum[0]
+  switch (property.type) {
+    case 'string': return ''
+    case 'number': return 0
+    case 'integer': return 0
+    case 'boolean': return false
+    case 'array': return []
+    case 'object': return {}
+    default: return null
+  }
+}
+
+/**
+ * Build one argument template per visible tool from its projected schema.
+ * @param schemas - visible tool schemas.
+ * @returns templates keyed by tool name.
+ */
+export function buildTemplates(schemas) {
+  const templates = Object.create(null)
+  for (const schema of schemas) {
+    const parameters = isObjectRecord(schema.parameters) ? schema.parameters : {}
+    const properties = isObjectRecord(parameters.properties) ? parameters.properties : {}
+    const keys = Object.keys(properties)
+    const required = Array.isArray(parameters.required) ? parameters.required.slice() : []
+    const sample = Object.create(null)
+    const defaults = Object.create(null)
+    for (const key of keys) {
+      const property = properties[key]
+      if (!isObjectRecord(property)) continue
+      sample[key] = sampleValue(property)
+      if (Object.prototype.hasOwnProperty.call(property, 'default')) defaults[key] = property.default
+    }
+    const template = {
+      description: schema.description === undefined ? '' : String(schema.description),
+      keys,
+      required,
+      sample,
+      parameters,
+    }
+    if (Object.keys(defaults).length > 0) template.defaults = defaults
+    templates[schema.name] = template
+  }
+  return templates
+}
+
+/** First sentence of a tool description, for the compact index. */
+function firstSentence(text) {
+  const value = typeof text === 'string' ? text : ''
+  const index = value.indexOf('. ')
+  return index === -1 ? value : value.slice(0, index + 1)
+}
+
+/**
+ * Compact SDK section: full definitions for common tools, names and one-line
+ * descriptions for the rest, with templates preloaded in the program.
+ * @param tools - visible capability definitions.
+ * @returns the generated system-prompt section.
+ */
+export function renderCompactSdk(tools) {
+  const common = tools.filter(tool => COMMON_TOOLS.has(tool.name))
+  const other = tools.filter(tool => !COMMON_TOOLS.has(tool.name))
+  const lines = [
+    '## Tools',
+    '',
+    'All tools are callable as await tools.name(args). All argument templates are preloaded in run_code_templates; print one with console.log(run_code_templates.<tool>) when you need its keys, required fields, or sample.',
+    '',
+    '### Common tools (full definitions)',
+    '',
+  ]
+  for (const tool of common) {
+    lines.push(JSON.stringify({ name: tool.name, description: tool.description, parameters: tool.parameters }))
+  }
+  lines.push('', '### Other tools (name, description; print the template for parameters)', '')
+  for (const tool of other) lines.push('- ' + tool.name + ': ' + firstSentence(tool.description))
+  lines.push(
+    '',
+    '### Calling',
+    '',
+    "- Put subtool JSON in a sibling field (bash, read, ...) and forward it: tools.bash(run_code_itself.bash) or run_code_call('bash', run_code_itself).",
+    '- For flat fields, use tool.key names: {"bash.command":"ls -la","bash.description":"List files"} with run_code_call(\'bash\', run_code_itself).',
+    '- run_code_templates and run_code_call are preloaded; no import.',
+  )
+  return lines.join('\n')
+}
+
+/**
+ * Injected call helper. It reads flat name.key fields from run_code_itself,
+ * fills the preloaded template, validates required keys, and calls the tool.
+ * This function is stringified into every program; it is not called here.
+ */
+function runCodeCall(name, values) {
+  const template = run_code_templates[name]
+  if (template === undefined) throw new Error('unknown tool template: ' + name)
+  const nested = values && typeof values[name] === 'object' && values[name] !== null && !Array.isArray(values[name])
+    ? values[name] : undefined
+  const args = {}
+  for (const key of template.keys) {
+    const flat = name + '.' + key
+    if (nested !== undefined && Object.prototype.hasOwnProperty.call(nested, key)) args[key] = nested[key]
+    else if (values !== null && values !== undefined && Object.prototype.hasOwnProperty.call(values, flat)) args[key] = values[flat]
+    else if (template.defaults !== undefined && Object.prototype.hasOwnProperty.call(template.defaults, key)) args[key] = template.defaults[key]
+  }
+  for (const key of template.required) {
+    if (!Object.prototype.hasOwnProperty.call(args, key)) {
+      throw new Error('missing required field ' + name + '.' + key + '; template: ' + JSON.stringify(template))
+    }
+  }
+  const call = tools[name]
+  if (typeof call !== 'function') throw new Error('unknown tool: ' + name)
+  return call(args)
+}
+
+/**
+ * The run_code transport with injected arguments, templates, and call helper.
+ * Everything else (validation, presentation, live schema getters, output
+ * rendering) stays owned by the wrapped transport.
  */
 export class RunCodeItselfExecutor extends PtcExecutor {
   #transport
 
   /**
-   * Wrap the reserved transport once. The base class caches the original in
-   * ptcTransport, so the Proxy and its target stay one object for the life of
-   * this executor.
+   * Replace the generated SDK section with the on-demand form.
+   * @param ctx - agent-scoped context the PTC transport executes in.
+   * @param config - validated program limits.
+   */
+  constructor(ctx, config) {
+    super(ctx, config)
+    const sections = this.sections
+    if (sections.length > 1) {
+      this.sections = [
+        sections[0],
+        {
+          name: sections[1].name,
+          order: sections[1].order,
+          interpolate: false,
+          text: tools => renderCompactSdk(tools),
+        },
+      ]
+    }
+  }
+
+  /**
+   * Wrap the reserved transport once.
    * @returns the transport proxy handed to schema projection and dispatch.
    */
   requirePtcTransport() {
@@ -131,9 +240,10 @@ export class RunCodeItselfExecutor extends PtcExecutor {
   }
 
   /**
-   * Keep the model-facing schema and add the extra-argument contract.
-   * @param tools - visible capability definitions, unused by the PTC transport.
-   * @returns the single run_code schema with open parameters.
+   * Keep the model-facing schema, add the sibling-field contract, and add the
+   * metaprogramming note to the code parameter.
+   * @param tools - visible capability definitions.
+   * @returns the run_code schema with open parameters.
    */
   describe(tools) {
     const description = super.describe(tools)
@@ -156,8 +266,7 @@ export class RunCodeItselfExecutor extends PtcExecutor {
                 code: {
                   ...code,
                   description: (typeof code.description === 'string' ? code.description + ' ' : '')
-                    + 'Program logic only: put subtool argument objects and escape-prone data in extra sibling fields and read them from run_code_itself. '
-                    + 'Inside the program, run_code_itself.code is this exact source text, so the program can inspect or eval it for metaprogramming.',
+                    + 'Program logic only: put subtool JSON and escape-prone values in extra sibling fields. run_code_itself.code is this exact source text and can be inspected or evaluated for metaprogramming.',
                 },
               },
             },
@@ -168,15 +277,21 @@ export class RunCodeItselfExecutor extends PtcExecutor {
   }
 
   /**
-   * Prepend the declaration, then hand the derived arguments to the transport.
+   * Inject run_code_itself, all tool templates, and the flat-field call helper.
    * @param transport - the unwrapped run_code definition.
-   * @param args - parsed model arguments, possibly with extra fields.
+   * @param args - parsed model arguments, possibly with sibling fields.
    * @param exec - the tool run context.
    * @returns the transport result.
    */
   async #execute(transport, args, exec) {
     if (!isObjectRecord(args) || typeof args.code !== 'string') return transport.execute(args, exec)
-    return transport.execute({ ...args, code: declarationFor(args) + '\n' + args.code }, exec)
+    const templates = buildTemplates(this.ctx.tools.schemas(exec.agent, exec.toolSet))
+    const prelude = [
+      'const run_code_templates = ' + jsonLiteral(templates) + ';',
+      'const run_code_call = ' + runCodeCall.toString() + ';',
+      declarationFor(args),
+    ].join('\n')
+    return transport.execute({ ...args, code: prelude + '\n' + args.code }, exec)
   }
 }
 
@@ -204,7 +319,7 @@ function executorConfig(settings, inherited) {
  * Select the enhanced executor for the mounting scope. A preset-scoped mount is
  * a drop-in replacement for dsh-tool-executor-ptc; a Host-scoped mount installs
  * an agent-scoped executor on every agent that would otherwise use the mounted
- * PTC executor, so presets, other agents, and the native executor stay untouched.
+ * PTC executor.
  * @param ctx - mounting context: a preset scope or the Host.
  * @param config - optional executor limits.
  */
@@ -216,11 +331,9 @@ export function apply(ctx, config) {
     ctx.logger.warn('run-code-itself: this DSH version changed its executor internals; the plugin stays inactive')
     return
   }
-  // Mounted inside a preset: this row replaces the stock PTC executor in that
-  // preset, so register the enhanced executor in the same scope and stop.
   if (scopeOf(ctx) !== undefined) {
     ctx.tools.setExecutor(new RunCodeItselfExecutor(ctx, executorConfig(settings, {})))
-    ctx.logger.info('run-code-itself: registered as this preset\'s tool executor')
+    ctx.logger.info('run-code-itself: registered as this preset tool executor')
     return
   }
   const installed = new WeakSet()

@@ -46,6 +46,26 @@ Prepare nested tool arguments the same way:
 {"code":"const r = await tools.bash(run_code_itself.bash); return r.stdout.text","description":"List files","bash":{"description":"List files","command":"ls -la"}}
 ```
 
+## Templates and flat-field calls
+
+Every visible tool's argument template is preloaded in `run_code_templates`. Print one to inspect its keys, required fields, sample, and raw parameters:
+
+```json
+{"code":"return run_code_templates.bash","description":"Read the bash template"}
+```
+
+Call with flat `tool.key` sibling fields:
+
+```json
+{"code":"return await run_code_call('bash', run_code_itself)","description":"List files","bash.command":"ls -la","bash.description":"List files"}
+```
+
+`run_code_call` fills the template, checks required keys, and calls `tools.bash`. A nested object such as `"bash": {...}` also works and takes precedence per key.
+
+## On-demand tool documentation
+
+The system prompt shows full definitions for the common tools (`bash`, `read`, `write`, `edit`, `glob`, `grep`) and a name/description index for all other visible tools. Every tool remains callable; for a hidden tool, print its template first, then call it with `run_code_call` or `tools.name`.
+
 ## Metaprogramming
 
 `run_code_itself.code` is the exact source of the running program. A program can read it, split it at its own markers, or `eval` a piece to generate code from a template. Keep the evaluated result valid JavaScript; extra fields are the easiest place to carry the template or its data.
@@ -60,7 +80,7 @@ Prepare nested tool arguments the same way:
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # or a packed tarball:
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.1.8.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.2.0.tgz
 ```
 
 Or use **Plugins → Add plugin** in the DSH Web UI and point it at the directory or tarball. The CLI only installs the package; the Web UI also selects the bundle (its patch is empty, so this only affects the Plugins listing).

@@ -81,14 +81,13 @@ assert.equal(schema.parameters.additionalProperties, true)
 assert.equal(schema.parameters.required.includes('code'), true)
 assert.equal(schema.parameters.required.includes('description'), true)
 assert.ok(schema.description.includes('additionalProperties: true'))
-assert.ok(schema.description.includes('**Passing data and subtool arguments**'))
-assert.ok(schema.description.includes('Subtool argument objects'))
-assert.ok(schema.description.includes('Why this is easier than inlining'))
+assert.ok(schema.description.includes('**Sibling fields — hard rules**'))
+assert.ok(schema.description.includes('Subtool JSON MUST be a sibling field'))
+assert.ok(schema.description.includes('regardless of payload size'))
+assert.ok(schema.description.includes('run_code_templates'))
+assert.ok(schema.description.includes('run_code_call'))
 assert.ok(schema.parameters.properties.code.description.includes('Program logic only'))
 assert.ok(schema.parameters.properties.code.description.includes('metaprogramming'))
-assert.ok(schema.description.includes('**Metaprogramming**'))
-assert.ok(schema.description.includes('regardless of payload size'))
-assert.ok(schema.description.includes('```json'))
 console.log('schema: open parameters and guidance present')
 
 // --- the proposed metaprogramming example ---------------------------------
@@ -100,7 +99,8 @@ console.log('schema: open parameters and guidance present')
     regex: '\\b\\d{3}-\\d{4}\\b',
     rows,
   })
-  assert.ok(program.startsWith('const run_code_itself = {'))
+  assert.ok(program.startsWith('const run_code_templates = '))
+  assert.ok(program.includes('const run_code_itself = {'))
   assert.ok(program.includes('\\\\b\\\\d{3}-\\\\d{4}\\\\b'))
   assert.deepEqual(value, [{ id: 'AB-123-4567' }])
   console.log('example: filtered', JSON.stringify(value))
@@ -248,5 +248,52 @@ console.log('')
   assert.equal(assembled.schemas[0].parameters.additionalProperties, true)
   console.log('preset mount: enhanced executor registered in the preset scope')
   await scope.dispose()
+}
+// --- preloaded templates and flat-field calls ------------------------------
+{
+  const bashSchema = {
+    name: 'bash',
+    description: 'Execute a shell command and return stdout/stderr.',
+    parameters: {
+      type: 'object',
+      properties: {
+        description: { type: 'string' },
+        command: { type: 'string' },
+        timeoutMs: { type: 'number' },
+      },
+      required: ['description', 'command'],
+    },
+  }
+  const templates = plugin.buildTemplates([bashSchema])
+  assert.deepEqual(templates.bash.keys, ['description', 'command', 'timeoutMs'])
+  assert.deepEqual(templates.bash.required, ['description', 'command'])
+  assert.equal(templates.bash.sample.command, '')
+  assert.equal(templates.bash.sample.timeoutMs, 0)
+  assert.deepEqual(templates.bash.parameters.required, ['description', 'command'])
+
+  const sdk = plugin.renderCompactSdk([bashSchema, { name: 'web_search', description: 'Search the web. Returns results.', parameters: {} }])
+  assert.ok(sdk.includes('### Common tools'))
+  assert.ok(sdk.includes('web_search: Search the web.'))
+  assert.ok(sdk.includes('run_code_templates'))
+
+  const { ctx, programs, tools } = harness()
+  tools.schemas = () => [bashSchema]
+  const executor = new plugin.RunCodeItselfExecutor(ctx, {})
+  executor.programs = programs
+  const transport = executor.requirePtcTransport()
+  await transport.execute({
+    code: 'return { keys: run_code_templates.bash.keys, called: await run_code_call("bash", run_code_itself) }',
+    description: 'Template call test',
+    'bash.command': 'ls -la',
+    'bash.description': 'List files',
+  }, toolExec())
+  const program = programs.at(-1)
+  assert.ok(program.includes('const run_code_templates = '))
+  assert.ok(program.includes('const run_code_call = '))
+  const fn = new AsyncFunction('tools', program)
+  const value = await fn({ bash: args => args })
+  assert.deepEqual(value.keys, ['description', 'command', 'timeoutMs'])
+  assert.deepEqual(value.called, { description: 'List files', command: 'ls -la' })
+  console.log('templates: preloaded and flat-field call resolved')
 }
 console.log('All checks passed')

@@ -42,6 +42,26 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 {"code":"const r = await tools.bash(run_code_itself.bash); return r.stdout.text","description":"列文件","bash":{"description":"列文件","command":"ls -la"}}
 ```
 
+## 模板与扁平字段调用
+
+所有可见工具的实参模板都预加载在 `run_code_templates` 里。打印其中一个即可查看键名、必填项、示例和原始参数：
+
+```json
+{"code":"return run_code_templates.bash","description":"查看 bash 模板"}
+```
+
+用扁平的 `tool.key` 兄弟字段调用：
+
+```json
+{"code":"return await run_code_call('bash', run_code_itself)","description":"列文件","bash.command":"ls -la","bash.description":"列文件"}
+```
+
+`run_code_call` 会套用模板、校验必填字段，然后调用 `tools.bash`。嵌套对象（如 `"bash": {...}`）也可以，按字段优先。
+
+## 按需工具文档
+
+系统提示词里只展开常用工具（`bash`、`read`、`write`、`edit`、`glob`、`grep`）的完整定义，其余可见工具只列名字和一句话描述。所有工具仍然可调用；对未展开的工具，先打印它的模板，再用 `run_code_call` 或 `tools.name` 调用。
+
 ## 元编程
 
 `run_code_itself.code` 是当前程序的完整原文。程序可以读取它、按自己的标记切分，或对其中一段执行 `eval`，从一个模板动态生成并运行代码。注意被 eval 的内容必须是合法 JavaScript；模板及其数据最好放在额外字段里。
@@ -51,7 +71,7 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # 或 tgz：
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.1.8.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.2.0.tgz
 ```
 
 也可以在 **插件** 页面选择 **添加插件**，指向目录或 tgz。命令行只安装包；UI 的 **添加插件** 还会把 bundle 选进 profile（bundle 的补丁是空的，所以只影响插件页的显示）。
