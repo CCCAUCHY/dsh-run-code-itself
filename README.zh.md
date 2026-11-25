@@ -26,20 +26,20 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 
 模型看到的 `run_code` 参数 schema 会把对象标记为可接受额外字段，并在工具说明里得到同样的用法说明。
 
-## 数据怎么传
+## 数据与子工具参数
 
-额外字段和 `code` 在同一个 JSON 对象里，值直接写 JSON，不要写成“JSON 字符串”：
+额外兄弟字段和 `code` 在同一个 JSON 对象里，值直接写 JSON，不要写成“JSON 字符串”：
 
 ```json
 {"code":"return run_code_itself.rows.length","description":"数行数","rows":[{"id":"AB-123-4567"}]}
 ```
 
-同样的数据如果写在 `code` 里，需要先写成 JavaScript 字面量，再作为 `code` 字符串做一层转义；额外字段只有外层 JSON 一层，程序里直接拿到解析好的值。无论载荷大小都适用：哪怕只是一个路径、命令、正则或小对象，只要它是子工具参数，就应放进额外字段。
+同样的数据如果写在 `code` 里，需要先写成 JavaScript 字面量，再作为 `code` 字符串做一层转义；额外字段只有外层 JSON 一层，程序里直接拿到解析好的值。无论载荷大小都适用：哪怕只是一个路径、命令、正则或小对象，只要它是子工具参数，就应放进额外字段。控制流、循环边界、简单数字、短状态字符串和内联逻辑则直接写在 `code` 里。
 
 子工具的 JSON 也这样提前放好：
 
 ```json
-{"code":"await tools.write(run_code_itself.write); return 1","description":"写 SVG","write":{"file_path":"out.svg","content":"<svg ...>...</svg>"}}
+{"code":"const r = await tools.bash(run_code_itself.bash); return r.stdout.text","description":"列文件","bash":{"description":"列文件","command":"ls -la"}}
 ```
 
 ## 元编程
@@ -51,7 +51,7 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # 或 tgz：
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.1.7.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.1.8.tgz
 ```
 
 也可以在 **插件** 页面选择 **添加插件**，指向目录或 tgz。命令行只安装包；UI 的 **添加插件** 还会把 bundle 选进 profile（bundle 的补丁是空的，所以只影响插件页的显示）。

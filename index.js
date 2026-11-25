@@ -34,21 +34,42 @@ const q = (text) => TICK + text + TICK
 
 /** Note placed at the end of the description, next to the parameter schema. */
 const EXTRA_FIELDS_NOTE = (
-  'The parameter schema sets @additionalProperties: true@: you can pass any extra top-level fields. '
-  + 'Prefer them for data and nested tool arguments regardless of payload size — writing JSON directly in an extra field avoids the escaping burden.'
+  'The parameter schema sets @additionalProperties: true@: extra sibling fields are allowed. '
+  + 'Prefer them for subtool arguments and escape-prone data, regardless of payload size — writing JSON directly in a sibling field avoids the escaping burden.'
 ).replaceAll('@', TICK)
 
 /** Model-facing contract for extra arguments, appended after the base description. */
 export const GUIDANCE = [
-  '**Extra fields are JSON**',
+  '**Passing data and subtool arguments**',
   '',
-  'The whole @run_code@ call is one JSON object. Besides @code@ and @description@, you may add any extra top-level fields (for example @rows@, @regex@, @write@, @bash@). Their values are ordinary JSON values in that same object — arrays, objects, strings, numbers — written directly, not as a quoted JSON string. For @rows@, write [{"id": "AB-123-4567"}], not a string containing that JSON.',
+  'The complete arguments object of this @run_code@ call is available inside the program as @run_code_itself@. Any extra sibling fields you add to the JSON arguments become parsed JavaScript values on @run_code_itself.<field>@.',
   '',
-  'Why this is easier than inlining: inside @code@, a payload must be written as a JavaScript literal and then escaped again as part of the @code@ JSON string — two layers. An extra field has only the outer JSON layer; the program receives the parsed value directly. This matters most for JSON documents, arrays, nested tool arguments, quotes, newlines, and long text.',
+  '**Put in extra sibling fields**',
   '',
-  'Inside the program, @run_code_itself@ is the complete argument object: @run_code_itself.code@ is the exact @code@ source, and every extra field is already parsed (@run_code_itself.rows@, @run_code_itself.write@). Do not declare it; do not call @JSON.parse@ on extra fields.',
+  '- **Subtool argument objects**: pass the whole object as a sibling field and forward it — @await tools.bash(run_code_itself.bash)@, @await tools.read(run_code_itself.read)@. Do this for every subtool call, regardless of payload size.',
+  '- **Escape-prone or structured data**: multi-line text, regex with backslashes, paths, JSON arrays and objects, templates. Values are ordinary JSON values in the same call object, not stringified JSON.',
   '',
-  'Apply this regardless of payload size: even a single path, command, regex, or small object belongs in an extra field when it is a subtool argument. Prepare every nested tool argument as an extra field and pass the object through, for example @tools.read(run_code_itself.read)@, @tools.bash(run_code_itself.bash)@, or @tools.write(run_code_itself.write)@. Do not write @tools.x({...})@ object literals inline in @code@.',
+  '**Keep in @code@ directly**',
+  '',
+  '- Control flow, loop bounds, simple numbers, short status strings, and inline logic (@for (let i = 0; i < 3; i++)@, @status === "ok"@).',
+  '',
+  'Why this is easier than inlining: inside @code@, a payload needs a JavaScript literal and then a second escaping layer for the @code@ string. A sibling field has only the outer JSON layer, and the program receives the parsed value directly. Do not call @JSON.parse@ on extra fields; do not declare @run_code_itself@.',
+  '',
+  '**Good — subtool arguments in a sibling field:**',
+  '',
+  '@@@json',
+  '',
+  '{"code":"const res = await tools.bash(run_code_itself.bash); return res.stdout.text;","description":"Read the last app log lines","bash":{"command":"tail -n 5 /var/log/app.log"}}',
+  '',
+  '@@@',
+  '',
+  '**Good — data used by code:**',
+  '',
+  '@@@json',
+  '',
+  '{"code":"const { rows, regex } = run_code_itself; return rows.filter(row => new RegExp(regex).test(row.id));","description":"Filter rows by id pattern","regex":"[0-9]{3}-[0-9]{4}","rows":[{"id":"AB-123-4567"},{"id":"ZZ-9999"}]}',
+  '',
+  '@@@',
   '',
   '**Metaprogramming**',
   '',
@@ -58,7 +79,7 @@ export const GUIDANCE = [
   '',
   '@@@json',
   '',
-  '{"code":"const t = run_code_itself.template; return await eval(\'(async () => {\' + t + \'})()\')","description":"Evaluate a template with data from extra fields","rows":[{"id":"AB-123-4567"},{"id":"ZZ-9999"}],"regex":"[0-9]{3}-[0-9]{4}","template":"return run_code_itself.rows.filter(row => new RegExp(run_code_itself.regex).test(row.id))"}',
+  '{"code":"const t = run_code_itself.template; return await eval(t)","description":"Evaluate a code template with data from extra fields","rows":[{"id":"AB-123-4567"},{"id":"ZZ-9999"}],"regex":"[0-9]{3}-[0-9]{4}","template":"(async () => run_code_itself.rows.filter(row => new RegExp(run_code_itself.regex).test(row.id)))()"}',
   '',
   '@@@',
 ].join('\n').replaceAll('@', TICK)
@@ -135,7 +156,7 @@ export class RunCodeItselfExecutor extends PtcExecutor {
                 code: {
                   ...code,
                   description: (typeof code.description === 'string' ? code.description + ' ' : '')
-                    + 'Program logic only: put data and nested tool arguments in extra top-level JSON fields and read them from run_code_itself. '
+                    + 'Program logic only: put subtool argument objects and escape-prone data in extra sibling fields and read them from run_code_itself. '
                     + 'Inside the program, run_code_itself.code is this exact source text, so the program can inspect or eval it for metaprogramming.',
                 },
               },
