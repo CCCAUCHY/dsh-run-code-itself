@@ -30,18 +30,41 @@ export const RUN_CODE_ITSELF = 'run_code_itself'
 
 /** Backtick, kept as a code point so this file needs no template literals. */
 const TICK = '\x60'
+const q = (text) => TICK + text + TICK
+
+/** One-line contract shown at the start of the run_code description. */
+const DATA_RULE = (
+  '**Data goes in extra fields:** pass payloads as JSON values in the top-level call and read them from @run_code_itself@; '
+  + 'do not inline JSON, nested tool arguments, or long text in @code@.'
+).replaceAll('@', TICK)
 
 /** Model-facing contract for extra arguments, appended to run_code's description. */
 export const GUIDANCE = [
-
   '',
+  '**Extra fields are JSON**',
   '',
-  '**Extra fields and ' + TICK + 'run_code_itself' + TICK + '**',
+  'The whole @run_code@ call is one JSON object. Besides @code@ and @description@, you may add any extra top-level fields (for example @rows@, @regex@, @write@, @bash@). Their values are ordinary JSON values in that same object — arrays, objects, strings, numbers — written directly, not as a quoted JSON string. For @rows@, write [{"id": "AB-123-4567"}], not a string containing that JSON.',
   '',
-  'Besides ' + TICK + 'code' + TICK + ' and ' + TICK + 'description' + TICK + ', this tool accepts any additional top-level JSON fields (for example ' + TICK + 'rows' + TICK + ', ' + TICK + 'regex' + TICK + ', or ' + TICK + 'payload' + TICK + '). Write the data as ordinary JSON in the call; do not escape it into the ' + TICK + 'code' + TICK + ' string.',
-  'Inside the program the preset variable ' + TICK + 'run_code_itself' + TICK + ' is the complete arguments object: ' + TICK + 'run_code_itself.code' + TICK + ' is this exact ' + TICK + 'code' + TICK + ' source, and every extra field arrives parsed, as in ' + TICK + 'run_code_itself.rows' + TICK + ' and ' + TICK + 'run_code_itself.regex' + TICK + '. Do not declare ' + TICK + 'run_code_itself' + TICK + ' in the program.',
-  'Example: {"code":"const { rows, regex } = run_code_itself; return rows.filter(row => new RegExp(regex).test(row.id))","description":"Filter rows by id pattern","regex":"\\\\b\\\\d{3}-\\\\d{4}\\\\b","rows":[{"id":"AB-123-4567"},{"id":"ZZ-9999"}]}',
-].join('\n')
+  'Inside the program, @run_code_itself@ is the complete argument object: @run_code_itself.code@ is the exact @code@ source, and every extra field is already parsed (@run_code_itself.rows@, @run_code_itself.write@). Do not declare it; do not call @JSON.parse@ on extra fields.',
+  '',
+  '**Why this is easier than inlining**',
+  '',
+  'Inside @code@, a payload must be written as a JavaScript literal and then escaped again as part of the @code@ JSON string — two layers. An extra field has only the outer JSON layer; the program receives the parsed value directly. This matters most for JSON documents, arrays, nested tool arguments, quotes, newlines, and long text.',
+  '',
+  '**Prepare nested tool arguments as extra fields**',
+  '',
+  'Put the subtool argument object in a field and pass it through:',
+  '',
+  '{"code":"await tools.write(run_code_itself.write); return 1","description":"Write the SVG","write":{"file_path":"out.svg","content":"<svg ...>...</svg>"}}',
+  '',
+  '{"code":"const r = await tools.bash(run_code_itself.bash); return r.stdout.text","description":"List files","bash":{"description":"List files","command":"ls -la"}}',
+  '',
+  'This keeps the nested JSON in the tool call instead of rebuilding and escaping it inside @code@.',
+  '',
+  '**Size**',
+  '',
+  'Keep each extra field small (a few KB). Do not put a complete large SVG/HTML/Markdown document in one field; split it into fields (for example @svgHead@, @svgBody@) or multiple calls, and let @code@ assemble it. Do not inline data in @code@ when it can live in an extra field.',
+].join('\n').replaceAll('@', TICK)
 
 /** True for the argument object shape a JSON tool call can produce. */
 function isObjectRecord(value) {
@@ -98,13 +121,30 @@ export class RunCodeItselfExecutor extends PtcExecutor {
     const description = super.describe(tools)
     return {
       ...description,
-      schemas: description.schemas.map(schema => schema.name === RUN_CODE_NAME && isObjectRecord(schema.parameters)
-        ? {
-            ...schema,
-            description: schema.description + GUIDANCE,
-            parameters: { ...schema.parameters, additionalProperties: true },
-          }
-        : schema),
+      schemas: description.schemas.map(schema => {
+        if (schema.name !== RUN_CODE_NAME || !isObjectRecord(schema.parameters)) return schema
+        const parameters = schema.parameters
+        const properties = isObjectRecord(parameters.properties) ? parameters.properties : {}
+        const code = isObjectRecord(properties.code) ? properties.code : undefined
+        return {
+          ...schema,
+          description: DATA_RULE + '\n\n' + schema.description + GUIDANCE,
+          parameters: {
+            ...parameters,
+            additionalProperties: true,
+            properties: {
+              ...properties,
+              ...code === undefined ? {} : {
+                code: {
+                  ...code,
+                  description: (typeof code.description === 'string' ? code.description + ' ' : '')
+                    + 'Program logic only: put data and nested tool arguments in extra top-level JSON fields and read them from run_code_itself.',
+                },
+              },
+            },
+          },
+        }
+      }),
     }
   }
 

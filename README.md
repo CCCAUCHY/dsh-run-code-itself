@@ -28,6 +28,24 @@ Inside the program:
 
 The model-facing `run_code` schema is open (`additionalProperties: true`) and its description explains the contract.
 
+## Passing data
+
+Extra fields are values in the same JSON object as `code` — write them as JSON, not as a stringified JSON string:
+
+```json
+{"code":"return run_code_itself.rows.length","description":"Count rows","rows":[{"id":"AB-123-4567"}]}
+```
+
+Inside `code`, the same payload needs a JavaScript literal and a second escaping layer for the `code` string. An extra field has only the outer JSON layer, and the program receives the parsed value directly.
+
+Prepare nested tool arguments the same way:
+
+```json
+{"code":"await tools.write(run_code_itself.write); return 1","description":"Write the SVG","write":{"file_path":"out.svg","content":"<svg ...>...</svg>"}}
+```
+
+Keep each field small (a few KB); split large documents or pass them in multiple calls.
+
 ## Requirements
 
 - DSH `0.2.2-rc.5`
@@ -38,7 +56,7 @@ The model-facing `run_code` schema is open (`additionalProperties: true`) and it
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # or a packed tarball:
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.1.3.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.1.4.tgz
 ```
 
 Or use **Plugins → Add plugin** in the DSH Web UI and point it at the directory or tarball. The CLI only installs the package; the Web UI also selects the bundle (its patch is empty, so this only affects the Plugins listing).

@@ -80,8 +80,10 @@ assert.equal(schema.name, 'run_code')
 assert.equal(schema.parameters.additionalProperties, true)
 assert.equal(schema.parameters.required.includes('code'), true)
 assert.equal(schema.parameters.required.includes('description'), true)
-assert.ok(schema.description.includes('**Extra fields and ' + BT + 'run_code_itself' + BT + '**'))
-assert.ok(schema.description.includes('additional top-level JSON fields'))
+assert.ok(schema.description.includes('**Data goes in extra fields:**'))
+assert.ok(schema.description.includes('**Extra fields are JSON**'))
+assert.ok(schema.description.includes('Why this is easier than inlining'))
+assert.ok(schema.parameters.properties.code.description.includes('Program logic only'))
 console.log('schema: open parameters and guidance present')
 
 // --- the proposed metaprogramming example ---------------------------------
