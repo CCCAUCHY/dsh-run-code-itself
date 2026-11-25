@@ -46,6 +46,10 @@ Prepare nested tool arguments the same way:
 
 Keep each field small (a few KB); split large documents or pass them in multiple calls.
 
+## Metaprogramming
+
+`run_code_itself.code` is the exact source of the running program. A program can read it, split it at its own markers, or `eval` a piece to generate code from a template. Keep the evaluated result valid JavaScript; extra fields are the easiest place to carry the template or its data.
+
 ## Requirements
 
 - DSH `0.2.2-rc.5`

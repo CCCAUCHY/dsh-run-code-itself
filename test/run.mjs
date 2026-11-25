@@ -84,6 +84,8 @@ assert.ok(schema.description.includes('**Data goes in extra fields:**'))
 assert.ok(schema.description.includes('**Extra fields are JSON**'))
 assert.ok(schema.description.includes('Why this is easier than inlining'))
 assert.ok(schema.parameters.properties.code.description.includes('Program logic only'))
+assert.ok(schema.parameters.properties.code.description.includes('metaprogramming'))
+assert.ok(schema.description.includes('**Metaprogramming**'))
 console.log('schema: open parameters and guidance present')
 
 // --- the proposed metaprogramming example ---------------------------------

@@ -51,6 +51,10 @@ export const GUIDANCE = [
   '',
   'Inside @code@, a payload must be written as a JavaScript literal and then escaped again as part of the @code@ JSON string — two layers. An extra field has only the outer JSON layer; the program receives the parsed value directly. This matters most for JSON documents, arrays, nested tool arguments, quotes, newlines, and long text.',
   '',
+  '**Metaprogramming**',
+  '',
+  '@run_code_itself.code@ is the exact source of this program. A program can read it, split it at its own markers, or @eval@ a piece to generate code from a template. Keep the evaluated result valid JavaScript; extra fields are the easiest place to carry the template or its data.',
+  '',
   '**Prepare nested tool arguments as extra fields**',
   '',
   'Put the subtool argument object in a field and pass it through:',
@@ -138,7 +142,8 @@ export class RunCodeItselfExecutor extends PtcExecutor {
                 code: {
                   ...code,
                   description: (typeof code.description === 'string' ? code.description + ' ' : '')
-                    + 'Program logic only: put data and nested tool arguments in extra top-level JSON fields and read them from run_code_itself.',
+                    + 'Program logic only: put data and nested tool arguments in extra top-level JSON fields and read them from run_code_itself. '
+                    + 'Inside the program, run_code_itself.code is this exact source text, so the program can inspect or eval it for metaprogramming.',
                 },
               },
             },
