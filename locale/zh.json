@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Run code itself",
+    "description": "为 PTC 程序提供 run_code_itself：run_code 调用中除 code 外的任意顶层字段都会以解析后的值出现在程序里，无需字符串转义。bundle 不自带任何插件行，安装后需自行挂载为 Host 行或 preset 的执行器。"
+  }
+}

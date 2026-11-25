@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Run code itself",
+    "description": "Gives PTC programs run_code_itself: extra top-level run_code fields arrive parsed with no string escaping. The bundle inserts no plugin rows; mount it yourself as a Host row or as a preset's executor."
+  }
+}

@@ -1,0 +1,6 @@
+# This bundle intentionally inserts no rows. Installing it only makes
+# dsh-run-code-itself available to the profile. Mount it yourself:
+#   - as a Host row in a profile/home patch, or
+#   - in a preset's plugins list in place of '@deepseek-ai/dsh-tool-executor-ptc'.
+# See README.md for both configurations.
+[]
