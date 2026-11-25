@@ -53,10 +53,10 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 用扁平的 `tool.key` 兄弟字段调用：
 
 ```json
-{"code":"return await run_code_call('bash', run_code_itself)","description":"列文件","bash.command":"ls -la","bash.description":"列文件"}
+{"code":"return await tools.bash(run_code_call.bash)","description":"列文件","bash.command":"ls -la","bash.description":"列文件"}
 ```
 
-`run_code_call` 会套用模板、校验必填字段，然后调用 `tools.bash`。嵌套对象（如 `"bash": {...}`）也可以，按字段优先。
+`run_code_call.<tool>` 是和 `run_code_itself` 一样预加载的变量：它保存每个工具组装好的参数对象，由模板、嵌套对象字段、扁平 `tool.key` 字段和默认值合成。调用时直接把它交给真实工具。嵌套对象（如 `"bash": {...}`）也可以，扁平字段按 key 优先。
 
 ## 按需工具文档
 
@@ -71,7 +71,7 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # 或 tgz：
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.2.0.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.2.1.tgz
 ```
 
 也可以在 **插件** 页面选择 **添加插件**，指向目录或 tgz。命令行只安装包；UI 的 **添加插件** 还会把 bundle 选进 profile（bundle 的补丁是空的，所以只影响插件页的显示）。

@@ -270,6 +270,8 @@ console.log('')
   assert.equal(templates.bash.sample.command, '')
   assert.equal(templates.bash.sample.timeoutMs, 0)
   assert.deepEqual(templates.bash.parameters.required, ['description', 'command'])
+  const calls = plugin.buildCalls(templates, { 'bash.command': 'ls -la', 'bash.description': 'List files' })
+  assert.deepEqual({ ...calls.bash }, { description: 'List files', command: 'ls -la' })
 
   const sdk = plugin.renderCompactSdk([bashSchema, { name: 'web_search', description: 'Search the web. Returns results.', parameters: {} }])
   assert.ok(sdk.includes('### Common tools'))
@@ -282,7 +284,7 @@ console.log('')
   executor.programs = programs
   const transport = executor.requirePtcTransport()
   await transport.execute({
-    code: 'return { keys: run_code_templates.bash.keys, called: await run_code_call("bash", run_code_itself) }',
+    code: 'return { keys: run_code_templates.bash.keys, call: run_code_call.bash }',
     description: 'Template call test',
     'bash.command': 'ls -la',
     'bash.description': 'List files',
@@ -290,10 +292,10 @@ console.log('')
   const program = programs.at(-1)
   assert.ok(program.includes('const run_code_templates = '))
   assert.ok(program.includes('const run_code_call = '))
-  const fn = new AsyncFunction('tools', program)
-  const value = await fn({ bash: args => args })
+  const fn = new AsyncFunction(program)
+  const value = await fn()
   assert.deepEqual(value.keys, ['description', 'command', 'timeoutMs'])
-  assert.deepEqual(value.called, { description: 'List files', command: 'ls -la' })
+  assert.deepEqual(value.call, { description: 'List files', command: 'ls -la' })
   console.log('templates: preloaded and flat-field call resolved')
 }
 console.log('All checks passed')

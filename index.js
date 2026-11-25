@@ -44,7 +44,7 @@ export const GUIDANCE = [
   '',
   'The complete arguments of this @run_code@ call are available as @run_code_itself@; extra sibling fields are already parsed JavaScript values.',
   '',
-  "1. **Subtool JSON MUST be a sibling field.** Put the whole argument object in a field named after the tool (@bash@, @read@, @write@, ...) and forward it with @run_code_call('bash', run_code_itself)@ or @tools.bash(run_code_itself.bash)@. Never write @tools.x({...})@ inline, regardless of payload size.",
+  "1. **Subtool JSON MUST be a sibling field.** Put the argument values in a field named after the tool (@bash@, @read@, @write@, ...): a nested object (@bash: {...}@) or flat @bash.key@ fields. The preloaded @run_code_call@ variable exposes the assembled object for every tool: call @tools.bash(run_code_call.bash)@. Never write @tools.x({...})@ inline, regardless of payload size.",
   '2. **Values that need escaping MUST be sibling fields:** multi-line text, regex or paths with backslashes, JSON arrays/objects, templates.',
   '3. **Other values:** use a sibling field when it reduces escaping or is long; simple literals, numbers, status strings, and control flow stay in @code@.',
   '',
@@ -54,7 +54,7 @@ export const GUIDANCE = [
   '',
   '@run_code_itself.code@ is the exact source; read, split, or @eval@ it. All tool templates are preloaded in @run_code_templates@; print @run_code_templates.<tool>@ for keys and samples.',
   '',
-  'Example: {"code":"return await tools.bash(run_code_itself.bash)","description":"List files","bash":{"command":"ls -la","description":"List files"}}',
+  'Example: {"code":"return await tools.bash(run_code_call.bash)","description":"List files","bash.command":"ls -la","bash.description":"List files"}',
 ].join('\n').replaceAll('@', TICK)
 
 /** True for the argument object shape a JSON tool call can produce. */
@@ -160,38 +160,39 @@ export function renderCompactSdk(tools) {
     '',
     '### Calling',
     '',
-    "- Put subtool JSON in a sibling field (bash, read, ...) and forward it: tools.bash(run_code_itself.bash) or run_code_call('bash', run_code_itself).",
-    '- For flat fields, use tool.key names: {"bash.command":"ls -la","bash.description":"List files"} with run_code_call(\'bash\', run_code_itself).',
+    '- Put subtool JSON in a sibling field (bash, read, ...), nested or flat tool.key fields. run_code_call.<tool> is the assembled argument object: call tools.bash(run_code_call.bash).',
+    '- For flat fields, use tool.key names: {"bash.command":"ls -la","bash.description":"List files"} populates run_code_call.bash.',
     '- run_code_templates and run_code_call are preloaded; no import.',
   )
   return lines.join('\n')
 }
 
 /**
- * Injected call helper. It reads flat name.key fields from run_code_itself,
- * fills the preloaded template, validates required keys, and calls the tool.
- * This function is stringified into every program; it is not called here.
+ * Build the preloaded run_code_call map: one assembled argument object per
+ * visible tool, from nested sibling fields and flat name.key fields.
+ * @param templates - templates returned by buildTemplates.
+ * @param args - the complete run_code arguments.
+ * @returns one argument object per tool.
  */
-function runCodeCall(name, values) {
-  const template = run_code_templates[name]
-  if (template === undefined) throw new Error('unknown tool template: ' + name)
-  const nested = values && typeof values[name] === 'object' && values[name] !== null && !Array.isArray(values[name])
-    ? values[name] : undefined
-  const args = {}
-  for (const key of template.keys) {
-    const flat = name + '.' + key
-    if (nested !== undefined && Object.prototype.hasOwnProperty.call(nested, key)) args[key] = nested[key]
-    else if (values !== null && values !== undefined && Object.prototype.hasOwnProperty.call(values, flat)) args[key] = values[flat]
-    else if (template.defaults !== undefined && Object.prototype.hasOwnProperty.call(template.defaults, key)) args[key] = template.defaults[key]
-  }
-  for (const key of template.required) {
-    if (!Object.prototype.hasOwnProperty.call(args, key)) {
-      throw new Error('missing required field ' + name + '.' + key + '; template: ' + JSON.stringify(template))
+export function buildCalls(templates, args) {
+  const calls = Object.create(null)
+  for (const name of Object.keys(templates)) {
+    const template = templates[name]
+    const nested = isObjectRecord(args[name]) ? args[name] : undefined
+    const call = Object.create(null)
+    if (nested !== undefined) {
+      for (const key of Object.keys(nested)) call[key] = nested[key]
     }
+    for (const key of template.keys) {
+      const flat = name + '.' + key
+      if (Object.prototype.hasOwnProperty.call(args, flat)) call[key] = args[flat]
+      else if (!Object.prototype.hasOwnProperty.call(call, key)
+        && template.defaults !== undefined
+        && Object.prototype.hasOwnProperty.call(template.defaults, key)) call[key] = template.defaults[key]
+    }
+    calls[name] = call
   }
-  const call = tools[name]
-  if (typeof call !== 'function') throw new Error('unknown tool: ' + name)
-  return call(args)
+  return calls
 }
 
 /**
@@ -288,8 +289,8 @@ export class RunCodeItselfExecutor extends PtcExecutor {
     const templates = buildTemplates(this.ctx.tools.schemas(exec.agent, exec.toolSet))
     const prelude = [
       'const run_code_templates = ' + jsonLiteral(templates) + ';',
-      'const run_code_call = ' + runCodeCall.toString() + ';',
       declarationFor(args),
+      'const run_code_call = ' + jsonLiteral(buildCalls(templates, args)) + ';',
     ].join('\n')
     return transport.execute({ ...args, code: prelude + '\n' + args.code }, exec)
   }
