@@ -44,6 +44,47 @@ The run_code tool description is deliberately short and contains the essential c
 
 The persona must use complete: false. With complete: true, the system-prompt guide is suppressed.
 
+## Prompt techniques
+
+These settings belong to a profile or dsh_home patch, not to the plugin's own cordis.patch.yml. The plugin-level file stays an empty array ([]); it only makes the plugin available and is mounted by the profile or preset.
+
+### Remove the harness identity globally
+
+    - id: harness-dev-context
+      disabled: true
+    - id: system-prompt
+      config:
+        includeHarnessIdentity: false
+
+This removes the implementation-checkout / Web-GUI context and the harness identity text from the global system prompt.
+
+### Persona
+
+Use this as the persona prefix; complete must remain false so the system guide is not suppressed:
+
+    - id: persona
+      name: '@deepseek-ai/dsh-persona'
+      config:
+        prefix: |
+          You are a helpful software engineer assistant. You MUST follow the run_code usage rules in the run_code tool description. Never inline subtool arguments. Use run_code_itself sibling fields or run_code_subtools templates, and return only JSON-safe values.
+        complete: false
+        includeRuntimeContext: false
+
+If you run several presets, add the same persona entry to each preset's plugin list.
+
+### AGENTS.md emphasis
+
+Append a short section to the user/workspace AGENTS.md:
+
+    ## run_code Data-Code Separation
+
+    - Never inline tools.x({...}) inside run_code code.
+    - Put data and every subtool argument in sibling fields of the call.
+    - Read run_code_itself or fill run_code_subtools templates; return only JSON-safe values.
+    - If a value needs quotes, backslashes, or newlines, move it to a sibling field.
+
+The repository's own cordis.patch.yml is deliberately []; do not copy the profile rows above into it.
+
 ## Mount
 
 Preset:

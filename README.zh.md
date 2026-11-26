@@ -44,6 +44,47 @@ run_code 工具描述故意很短，但保留了最基本的契约，所以系�
 
 persona 必须使用 complete: false；complete: true 会抑制系统规范段。
 
+## 提示词技巧
+
+下面这些属于 profile 或 dsh_home 级 patch，不属于插件自己的 cordis.patch.yml。插件级文件保持空数组（[]），只负责让插件可用，由 profile 或 preset 挂载。
+
+### 全局关闭 harness 身份
+
+    - id: harness-dev-context
+      disabled: true
+    - id: system-prompt
+      config:
+        includeHarnessIdentity: false
+
+这会从全局系统提示词里去掉 implementation checkout / Web GUI 上下文和 harness 身份文字。
+
+### Persona
+
+把下面的 prefix 用作 persona；complete 必须保持 false，否则系统规范段会被抑制：
+
+    - id: persona
+      name: '@deepseek-ai/dsh-persona'
+      config:
+        prefix: |
+          You are a helpful software engineer assistant. You MUST follow the run_code usage rules in the run_code tool description. Never inline subtool arguments. Use run_code_itself sibling fields or run_code_subtools templates, and return only JSON-safe values.
+        complete: false
+        includeRuntimeContext: false
+
+如果使用多个 preset，需要在每个 preset 的 plugins 列表里都加同样的 persona 条目。
+
+### AGENTS.md 强调
+
+在用户级或工作区级 AGENTS.md 里追加：
+
+    ## run_code Data-Code Separation
+
+    - Never inline tools.x({...}) inside run_code code.
+    - Put data and every subtool argument in sibling fields of the call.
+    - Read run_code_itself or fill run_code_subtools templates; return only JSON-safe values.
+    - If a value needs quotes, backslashes, or newlines, move it to a sibling field.
+
+仓库自己的 cordis.patch.yml 故意保持 []；不要把上面的 profile 配置复制进去。
+
 ## 挂载
 
 Preset：
