@@ -72,11 +72,13 @@ Result:
 {"description":"Execute a shell command and return stdout/stderr.","template":{"description":"","command":""}}
 ```
 
-`run_code_subtools.bash` is the wrapper, not the arguments. `run_code_subtools.bash.template` is the argument object; after filling the required fields it can be passed directly to `tools.bash`:
+`run_code_subtools.bash` is the wrapper, not the arguments. `run_code_subtools.bash.template` is the argument object; fill the required values from extra fields, then pass it directly to `tools.bash`:
 
 ```json
-{"code":"const args = run_code_subtools.bash.template; args.description = 'List files'; args.command = 'ls -la'; return await tools.bash(args)","description":"List files"}
+{"code":"const args = run_code_subtools.bash.template; args.description = run_code_itself.label; args.command = run_code_itself.command; return await tools.bash(args)","description":"List files","label":"List files","command":"ls -la"}
 ```
+
+The values live in extra fields, so the `code` string contains no quoted literals to escape.
 
 The `bash` sibling field is a separate free-form field you write into the `run_code` call; at runtime it is `run_code_itself.bash`. That path is also valid:
 
@@ -104,7 +106,7 @@ The system prompt renders a compact SDK with full TypeScript declarations for th
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # or a packed tarball:
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.4.2.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.4.3.tgz
 ```
 
 Or use **Plugins → Add plugin** in the DSH Web UI and point it at the directory or tarball. The CLI only installs the package; the Web UI also selects the bundle (its patch is empty, so this only affects the Plugins listing).

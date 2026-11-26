@@ -68,11 +68,13 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 {"description":"Execute a shell command and return stdout/stderr.","template":{"description":"","command":""}}
 ```
 
-`run_code_subtools.bash` 是包装对象，不是参数。`run_code_subtools.bash.template` 才是参数对象；填完必填字段后可以直接传给 `tools.bash`：
+`run_code_subtools.bash` 是包装对象，不是参数。`run_code_subtools.bash.template` 才是参数对象；从额外字段取值填完必填字段后，可以直接传给 `tools.bash`：
 
 ```json
-{"code":"const args = run_code_subtools.bash.template; args.description = '列文件'; args.command = 'ls -la'; return await tools.bash(args)","description":"列文件"}
+{"code":"const args = run_code_subtools.bash.template; args.description = run_code_itself.label; args.command = run_code_itself.command; return await tools.bash(args)","description":"列文件","label":"列文件","command":"ls -la"}
 ```
+
+值都在额外字段里，所以 `code` 字符串本身不需要带引号的字面量，也就少一层转义。
 
 `bash` 兄弟字段是 `run_code` 调用里的另一个自由字段，运行时解析成 `run_code_itself.bash`；这条路也有效：
 
@@ -95,7 +97,7 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # 或 tgz：
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.4.2.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.4.3.tgz
 ```
 
 也可以在 **插件** 页面选择 **添加插件**，指向目录或 tgz。命令行只安装包；UI 的 **添加插件** 还会把 bundle 选进 profile（bundle 的补丁是空的，所以只影响插件页的显示）。
