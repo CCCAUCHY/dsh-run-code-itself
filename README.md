@@ -29,6 +29,8 @@ or use the template:
 
 run_code_subtools is a plain JSON object. All visible tools are there, including tools not listed in the prompt; inspect it with Object.keys(run_code_subtools) or print a named entry.
 
+Templates are structural skeletons: required fields are present with simple empty placeholders, and optional fields with schema defaults are included. Complex enum, union, or nested required values are not guessed; fill them in code and rely on the tool schema for validation.
+
 ## System guide and tool description
 
 The system prompt contains:

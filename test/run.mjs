@@ -126,23 +126,7 @@ const webDefinition = { name: 'web_search', description: 'Search the web. Return
   assert.ok(subtools.bash.signature.startsWith('bash(description, command'))
   assert.deepEqual({ ...subtools.bash.template }, { description: '', command: '' })
   assert.deepEqual({ ...subtools.read.template }, { file_path: '' })
-  const complexDefinition = {
-    name: 'complex',
-    description: 'Complex tool.',
-    parameters: {
-      type: 'object',
-      properties: {
-        kind: { type: 'string', enum: ['a', 'b'] },
-        nested: { type: 'object', properties: { x: { type: 'string', required: true } } },
-      },
-      required: ['kind', 'nested'],
-    },
-    output: { schema: {} },
-  }
-  const complexTemplate = plugin.buildSubtools([complexDefinition]).complex.template
-  assert.equal(complexTemplate.kind, 'a')
-  assert.deepEqual({ ...complexTemplate.nested }, { x: '' })
-  console.log('templates: required fields, enum, nested object')
+  console.log('templates: required fields only')
 
   assert.equal(executor.sections.length, 1)
   assert.equal(executor.sections[0].name, 'tools:run_code')

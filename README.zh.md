@@ -29,6 +29,8 @@ DSH PTC 的 Data-Code Separation 插件。
 
 run_code_subtools 是普通 JSON；所有可见工具都在里面，包括没有列在提示词里的工具。可以用 Object.keys(run_code_subtools) 或打印某个条目。
 
+模板是结构骨架：必填字段给出简单空占位，有 schema 默认值的选填字段会带上默认值。复杂 enum、union、嵌套 required 的值不做猜测；在代码里填写，由工具 schema 校验。
+
 ## 系统规范与工具描述
 
 系统提示词包含：

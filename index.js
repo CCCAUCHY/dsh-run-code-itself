@@ -54,29 +54,16 @@ export function declarationFor(name, payload) {
   return 'const ' + name + ' = ' + jsonLiteral(payload) + ';'
 }
 
-/** Empty type placeholder for a required JSON Schema property. */
+/** Simple empty placeholder for a required JSON Schema property. */
 function emptyValue(property) {
   if (Object.prototype.hasOwnProperty.call(property, 'const')) return property.const
-  if (Array.isArray(property.enum) && property.enum.length > 0) return property.enum[0]
-  if (Array.isArray(property.oneOf) && property.oneOf.length > 0) return emptyValue(property.oneOf[0])
-  if (Array.isArray(property.anyOf) && property.anyOf.length > 0) return emptyValue(property.anyOf[0])
   switch (property.type) {
     case 'string': return ''
     case 'number': return 0
     case 'integer': return 0
     case 'boolean': return false
     case 'array': return []
-    case 'object': {
-      const sample = Object.create(null)
-      const properties = isObjectRecord(property.properties) ? property.properties : {}
-      const required = Array.isArray(property.required) ? property.required
-        : Object.keys(properties).filter(key => properties[key]?.required === true)
-      for (const key of required) {
-        const child = properties[key]
-        if (isObjectRecord(child)) sample[key] = emptyValue(child)
-      }
-      return sample
-    }
+    case 'object': return {}
     default: return null
   }
 }
@@ -145,6 +132,7 @@ export function renderProgramGuide(tools) {
     '',
     'run_code_itself: the complete arguments of this call, including every sibling field.',
     'run_code_subtools: one entry per tool, shaped as { description, template, signature }.',
+    'The template is a structural skeleton. Complex enum, union, or nested values must be filled in code and checked against the tool schema.',
     '',
     '## How to call a tool',
     '',
