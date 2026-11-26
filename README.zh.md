@@ -136,6 +136,8 @@ profile 配置示例：
 
     DSH_PACKAGES_DIR=... node --experimental-loader ./test/loader.mjs ./test/run.mjs
 
-测试覆盖 schema、规范长度、枚举/嵌套模板、变量注入、特殊载荷、别名分发、Python 拒绝和 preset 挂载。
+测试覆盖 schema、规范长度、模板、变量注入、特殊载荷、别名分发和 preset 挂载。
+
+固定提示词放在 prompts/ 下：guide.md 和 tool-description.txt；index.js 只负责加载和渲染，不再内联大段提示词。
 
 MIT。

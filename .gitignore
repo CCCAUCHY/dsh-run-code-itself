@@ -14,3 +14,7 @@ coverage/
 # Never commit credentials
 github-token
 .secrets/
+
+# Local review draft, not published
+TOOL_CATALOG.md
+tool-catalog.json

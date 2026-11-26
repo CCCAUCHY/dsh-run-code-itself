@@ -136,6 +136,8 @@ A previous experimental version exposed the tool as program. Three independent r
 
     DSH_PACKAGES_DIR=... node --experimental-loader ./test/loader.mjs ./test/run.mjs
 
-The test covers schema, guide length, templates with enum/nested objects, injection, special payloads, alias dispatch, Python rejection, and preset mounting.
+The test covers schema, guide length, templates, injection, special payloads, alias dispatch, and preset mounting.
+
+Fixed prompt data lives under prompts/: guide.md and tool-description.txt. index.js only loads and renders it.
 
 MIT.
