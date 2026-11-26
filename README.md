@@ -28,7 +28,7 @@ Array and loop:
 
     {"code":"const out = []; for (const e of run_code_itself.edits) out.push(await tools.edit(e)); return out.map(r => r.path)","description":"Apply edits","edits":[{"file_path":"a.ts","old_string":"old","new_string":"new"},{"file_path":"b.ts","old_string":"old2","new_string":"new2"}]}
 
-run_code_subtools is a plain JSON object. All visible tools are there, including tools not listed in the prompt; inspect it with Object.keys(run_code_subtools) or print a named entry.
+run_code_subtools is a plain JSON object. All visible tools are there, and the system guide also lists a compact directory of every tool; inspect details with Object.keys(run_code_subtools) or print a named entry.
 
 Templates are structural skeletons: required fields are present with simple empty placeholders, and optional fields with schema defaults are included. Complex enum, union, or nested required values are not guessed; fill them in code and rely on the tool schema for validation.
 
@@ -38,7 +38,7 @@ The system prompt contains:
 
 - Data-Code Separation rules;
 - compact signatures for common tools: bash, read, write, edit, glob, grep, read_image;
-- a hidden-tools note.
+- the compact directory for every other visible tool.
 
 The run_code tool description is deliberately short and contains the essential contract, so a suppressed system guide does not remove every rule. The guide is longer than the tool description.
 

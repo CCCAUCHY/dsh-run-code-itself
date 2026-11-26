@@ -1,0 +1,1371 @@
+[
+  {
+    "name": "working_directory",
+    "description": "Read the current working directory, or change it with cd. Relative paths use the current directory. Existing shells and running processes keep their own directories.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "cd": {
+          "type": "string",
+          "description": "Existing directory to enter. Omit to read the current directory."
+        }
+      }
+    }
+  },
+  {
+    "name": "team_task_create",
+    "description": "Create one unowned pending task on the shared Team task board.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "subject": {
+          "type": "string",
+          "description": "Concise task title."
+        },
+        "description": {
+          "type": "string",
+          "description": "Complete task details and acceptance criteria."
+        },
+        "blocked_by": {
+          "type": "array",
+          "description": "Task ids that must complete first.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "write_scopes": {
+          "type": "array",
+          "description": "Advisory workspace-relative file or directory prefixes this task expects to modify.",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "subject",
+        "description"
+      ]
+    }
+  },
+  {
+    "name": "team_task_list",
+    "description": "List shared tasks, including readiness, owner, revision, blockers, and write-scope warnings.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "description": "Optional exact status filter.",
+          "enum": [
+            "pending",
+            "in_progress",
+            "completed"
+          ]
+        },
+        "owner": {
+          "type": "string",
+          "description": "Optional owner agent name filter; cannot be combined with unowned."
+        },
+        "unowned": {
+          "type": "boolean",
+          "description": "Filter tasks by whether they have no owner; cannot be combined with owner."
+        },
+        "ready": {
+          "type": "boolean",
+          "description": "Optional readiness filter."
+        },
+        "cursor": {
+          "type": "integer",
+          "description": "Zero-based result offset. Defaults to 0."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Number of rows, 1 through 100. Defaults to 50."
+        }
+      }
+    }
+  },
+  {
+    "name": "team_task_get",
+    "description": "Read the complete latest value of one shared task before changing or executing it.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "description": "Shared task id."
+        }
+      },
+      "required": [
+        "task_id"
+      ]
+    }
+  },
+  {
+    "name": "team_task_update",
+    "description": "Compare-and-set a shared task action using the latest revision from team_task_get or team_task_list.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "description": "Shared task id."
+        },
+        "expected_revision": {
+          "type": "integer",
+          "description": "Current task revision used as the CAS precondition."
+        },
+        "action": {
+          "type": "string",
+          "description": "Task transition to apply.",
+          "enum": [
+            "claim",
+            "release",
+            "edit",
+            "set_dependencies",
+            "complete",
+            "reopen",
+            "reassign",
+            "delete"
+          ]
+        },
+        "subject": {
+          "type": "string",
+          "description": "Replacement title for edit."
+        },
+        "description": {
+          "type": "string",
+          "description": "Replacement details for edit."
+        },
+        "blocked_by": {
+          "type": "array",
+          "description": "Complete blocker list for set_dependencies.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "write_scopes": {
+          "type": "array",
+          "description": "Replacement advisory write scopes for edit.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "owner": {
+          "type": "string",
+          "description": "Agent name of the root or any continuable descendant for root-only reassign; omit to unassign."
+        }
+      },
+      "required": [
+        "task_id",
+        "expected_revision",
+        "action"
+      ]
+    }
+  },
+  {
+    "name": "list_mcp_resources",
+    "description": "List resources available from an MCP server.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "server": {
+          "type": "string",
+          "description": "Configured MCP server name."
+        },
+        "cursor": {
+          "type": "string",
+          "description": "Continuation cursor returned by this server."
+        }
+      },
+      "required": [
+        "server"
+      ]
+    }
+  },
+  {
+    "name": "list_mcp_resource_templates",
+    "description": "List parameterized resource URI templates from an MCP server.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "server": {
+          "type": "string",
+          "description": "Configured MCP server name."
+        },
+        "cursor": {
+          "type": "string",
+          "description": "Continuation cursor returned by this server."
+        }
+      },
+      "required": [
+        "server"
+      ]
+    }
+  },
+  {
+    "name": "read_mcp_resource",
+    "description": "Read an MCP resource by URI from the named server. Use a listed URI or an expanded resource template.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "server": {
+          "type": "string",
+          "description": "Configured MCP server name."
+        },
+        "uri": {
+          "type": "string",
+          "description": "Resource URI to read."
+        }
+      },
+      "required": [
+        "server",
+        "uri"
+      ]
+    }
+  },
+  {
+    "name": "job_output",
+    "description": "Read a background job: output since the previous read for stream jobs, or the result of a finished final-output job.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "job_id": {
+          "type": "string",
+          "description": "Job id returned by the tool that started the background work."
+        },
+        "wait": {
+          "type": "boolean",
+          "description": "Block until the job finishes or the timeout expires; a timed-out wait leaves the job running. Defaults to false."
+        },
+        "timeout_ms": {
+          "type": "number",
+          "description": "Max wait in milliseconds with wait: true. Defaults to and is capped by configuration."
+        }
+      },
+      "required": [
+        "job_id"
+      ]
+    }
+  },
+  {
+    "name": "job_list",
+    "description": "List your background jobs (running and finished) with their ids, kinds, and statuses.",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "job_kill",
+    "description": "Request cancellation of a running background job.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "job_id": {
+          "type": "string",
+          "description": "Job id returned by the tool that started the background work."
+        },
+        "reason": {
+          "type": "string",
+          "description": "Optional short reason, recorded in the log and forwarded to the job."
+        }
+      },
+      "required": [
+        "job_id"
+      ]
+    }
+  },
+  {
+    "name": "read",
+    "description": "Read a UTF-8 text file and return line-numbered content.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "file_path": {
+          "type": "string",
+          "description": "Path to read, resolved by the filesystem backend."
+        },
+        "offset": {
+          "type": "number",
+          "description": "1-based first line to return. Defaults to 1."
+        },
+        "limit": {
+          "type": "number",
+          "description": "Maximum number of lines to return. Defaults to 2000."
+        }
+      },
+      "required": [
+        "file_path"
+      ]
+    }
+  },
+  {
+    "name": "write",
+    "description": "Create or fully replace a UTF-8 text file.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "file_path": {
+          "type": "string",
+          "description": "Path to write, resolved by the filesystem backend. Provide `file_path` before `content` in the arguments."
+        },
+        "content": {
+          "type": "string",
+          "description": "Full UTF-8 text content to write."
+        },
+        "sandbox_permissions": {
+          "type": "string",
+          "description": "The narrowest wider sandbox mode for a one-shot retry of the exact operation the sandbox just denied; the retry asks the user for approval.",
+          "enum": [
+            "workspace-write",
+            "danger-full-access"
+          ]
+        },
+        "justification": {
+          "type": "string",
+          "description": "Required with sandbox_permissions: one sentence for the user explaining why this exact file operation needs the wider access. Use the language of the user’s current request."
+        }
+      },
+      "required": [
+        "file_path",
+        "content"
+      ]
+    }
+  },
+  {
+    "name": "edit",
+    "description": "Edit an existing UTF-8 text file by replacing literal text.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "file_path": {
+          "type": "string",
+          "description": "Path to edit, resolved by the filesystem backend. Provide `file_path` before `old_string` and `new_string` in the arguments."
+        },
+        "old_string": {
+          "type": "string",
+          "description": "Literal text to replace."
+        },
+        "new_string": {
+          "type": "string",
+          "description": "Literal replacement text. Use an empty string to delete the match."
+        },
+        "replace_all": {
+          "type": "boolean",
+          "description": "Replace all matches. Defaults to false; when false, old_string must appear exactly once."
+        },
+        "sandbox_permissions": {
+          "type": "string",
+          "description": "The narrowest wider sandbox mode for a one-shot retry of the exact operation the sandbox just denied; the retry asks the user for approval.",
+          "enum": [
+            "workspace-write",
+            "danger-full-access"
+          ]
+        },
+        "justification": {
+          "type": "string",
+          "description": "Required with sandbox_permissions: one sentence for the user explaining why this exact file operation needs the wider access. Use the language of the user’s current request."
+        }
+      },
+      "required": [
+        "file_path",
+        "old_string",
+        "new_string"
+      ]
+    }
+  },
+  {
+    "name": "glob",
+    "description": "Find files, not directories, whose paths match a glob pattern, including hidden and ignored files. Returns up to 100 paths in modification-time order; a larger result keeps the first paths and reports where the complete list was saved.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "pattern": {
+          "type": "string",
+          "description": "Glob pattern to match file paths against (e.g. \"**/*.ts\", \"src/**/*.test.js\"). A pattern with no \"/\" matches the basename at any depth, so \"*\" and \"*.ts\" both search the whole tree; include a separator to anchor the depth."
+        },
+        "path": {
+          "type": "string",
+          "description": "Directory to search in. Defaults to the session workspace; a relative path resolves against it."
+        }
+      },
+      "required": [
+        "pattern"
+      ]
+    }
+  },
+  {
+    "name": "grep",
+    "description": "Search file contents with a ripgrep regular expression. Returns matching lines with line numbers, grouped by file. Returns up to 250 matches; a larger result reports where the complete match list was saved.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "pattern": {
+          "type": "string",
+          "description": "Regular expression to search for (ripgrep syntax)."
+        },
+        "path": {
+          "type": "string",
+          "description": "File or directory to search. Defaults to the session workspace; a relative path resolves against it."
+        },
+        "include": {
+          "type": "string",
+          "description": "One glob filter for which files to search (e.g. \"*.ts\", \"*.{js,jsx}\"). Not a list; negation is not supported."
+        }
+      },
+      "required": [
+        "pattern"
+      ]
+    }
+  },
+  {
+    "name": "skill",
+    "description": "Load the full instructions for a skill. Call it before acting on a task that names or clearly matches a skill in the session skill catalog.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The exact skill name from the available skills list."
+        }
+      },
+      "required": [
+        "name"
+      ]
+    }
+  },
+  {
+    "name": "bash",
+    "description": "Execute a bash command (`bash -c`) and return its stdout/stderr. Each call runs in a fresh shell; pass `workdir` instead of using `cd`. Managed `$DSH_*` variables expose current harness environment facts. Long output is truncated to its tail; the full output is saved to a file whose path is reported when available. Provide `description` before `command` in the arguments. Before any delete or move, verify that the resolved absolute target path is the intended one; never run it against a computed path you have not checked. An unset variable expands to an empty string, so guard variables in such paths with `${VAR:?}`. Commands may run under a file sandbox; a blocked file operation is reported as `[sandbox: file access denied under <mode> mode]`, a policy denial: do not retry another way.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Clear, concise description of what this command does in active voice, 5-10 words (shown in the UI). Examples: \"ls\" → \"List files in current directory\"; \"git status\" → \"Show working tree status\"; \"npm install\" → \"Install package dependencies\"."
+        },
+        "command": {
+          "type": "string",
+          "description": "The bash command to execute."
+        },
+        "timeoutMs": {
+          "type": "number",
+          "description": "Timeout in milliseconds. The executor applies its configured default and cap; on expiry the command moves to the background as a job instead of being killed."
+        },
+        "workdir": {
+          "type": "string",
+          "description": "Working directory for this command. Defaults to the session workspace; a relative path is resolved against it."
+        },
+        "run_in_background": {
+          "type": "boolean",
+          "description": "Run in the background and return a job id immediately (collect with job_output, stop with job_kill). No timeout applies."
+        },
+        "sandbox_permissions": {
+          "type": "string",
+          "description": "The narrowest wider sandbox mode for a one-shot retry of the exact command the sandbox just denied; the retry asks the user for approval.",
+          "enum": [
+            "workspace-write",
+            "danger-full-access"
+          ]
+        },
+        "justification": {
+          "type": "string",
+          "description": "Required with sandbox_permissions: one sentence for the user explaining why this exact command needs the wider access. Use the language of the user’s current request."
+        }
+      },
+      "required": [
+        "description",
+        "command"
+      ]
+    }
+  },
+  {
+    "name": "read_image",
+    "description": "Read a PNG/JPEG/WebP/GIF file and return the image itself. Large images are downscaled automatically; do not install image libraries or create thumbnails to inspect an image.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "file_path": {
+          "type": "string",
+          "description": "Path to the image file, resolved by the filesystem backend."
+        }
+      },
+      "required": [
+        "file_path"
+      ]
+    }
+  },
+  {
+    "name": "cordis_inspect_list",
+    "description": "List every Cordis Inspect Provider currently known to the Host, including local Host Providers and the latest manifests synchronized from the Client. Each entry includes its platform, purpose, read-only methods, and input/output schemas. Call this Tool before writing or configuring a plugin, then select the provider and method for cordis_inspect_query from its result. Do not guess names or treat an Inspect method as a business Service that Plugin code can call.",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "cordis_inspect_query",
+    "description": "Run a read-only query declared by an Inspect Provider. platform, provider, and method must come from cordis_inspect_list, and input must satisfy that method's schema. Use this Tool before writing plugin code to read exact Service methods, Event modes, plugin Config schemas, Tool schemas, theme tokens, or live Slot trees and props. Host queries run locally. A Client query waits for the first valid page response within the configured timeout; otherwise it reports a Client failure or asks you to reconnect and retry. This Tool cannot invoke business Service methods or modify the runtime.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "platform": {
+          "type": "string",
+          "description": "Runtime platform that owns the Provider.",
+          "enum": [
+            "host",
+            "client"
+          ]
+        },
+        "provider": {
+          "type": "string",
+          "description": "Exact Provider ID returned by cordis_inspect_list."
+        },
+        "method": {
+          "type": "string",
+          "description": "Exact method name declared by the Provider manifest."
+        },
+        "input": {
+          "description": "Optional query input; it must satisfy the method input schema."
+        }
+      },
+      "required": [
+        "platform",
+        "provider",
+        "method"
+      ]
+    }
+  },
+  {
+    "name": "office_render",
+    "description": "Render document pages, slides, or worksheet areas as images you can view.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "string",
+          "description": "Path to doc, docx, odt, xls, xlsx, ods, ppt, pptx, odp, or pdf; not modified."
+        },
+        "pages": {
+          "type": "array",
+          "description": "Distinct one-based pages or slides; omit for all. Spreadsheets use sheet and range instead.",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "sheet": {
+          "type": "string",
+          "description": "Exact worksheet name; omit to render every visible sheet."
+        },
+        "range": {
+          "type": "string",
+          "description": "A1 range, such as A1:H40; requires sheet. Omit for the used area."
+        },
+        "dpi": {
+          "type": "integer",
+          "description": "Resolution from 24 to 600; default 144."
+        }
+      },
+      "required": [
+        "input"
+      ]
+    }
+  },
+  {
+    "name": "office_convert",
+    "description": "Convert a document to another format. Return a temporary file to copy to its destination with the shell.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "string",
+          "description": "Path to doc, docx, odt, xls, xlsx, ods, ppt, pptx, or odp; not modified."
+        },
+        "format": {
+          "type": "string",
+          "description": "Word: pdf, docx, odt, txt. Excel: pdf, xlsx, ods, csv. PowerPoint: pdf, pptx, odp.",
+          "enum": [
+            "pdf",
+            "docx",
+            "odt",
+            "txt",
+            "xlsx",
+            "ods",
+            "csv",
+            "pptx",
+            "odp"
+          ]
+        },
+        "sheet": {
+          "type": "string",
+          "description": "Exact worksheet name for CSV only; required when the workbook has several sheets."
+        }
+      },
+      "required": [
+        "input",
+        "format"
+      ]
+    }
+  },
+  {
+    "name": "office_recalculate",
+    "description": "Recalculate spreadsheet formulas. Return a temporary workbook to copy to its destination with the shell.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "string",
+          "description": "Path to an xls, xlsx, or ods workbook; not modified."
+        },
+        "format": {
+          "type": "string",
+          "description": "Output workbook format.",
+          "enum": [
+            "xlsx",
+            "ods"
+          ]
+        }
+      },
+      "required": [
+        "input",
+        "format"
+      ]
+    }
+  },
+  {
+    "name": "list_agents",
+    "description": "List your entire subagent tree: the root agent and all reachable continuable descendants, including yourself. Rows carry names, descriptions, and status. A descendant's name is its path from the root, such as reviewer/checker. You can message any other agent in the subagent tree. running means it is working; inactive means no turn is executing; it does not indicate task completion, success, or failure. corrupt, unsupported, or unavailable means this row's own descendants could not be read; the row itself is still a member you can message. While you remain active, you will be notified when a direct child finishes; there is no need to keep checking its status. Use send_message to continue the conversation.",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "wait_agent",
+    "description": "Wait for input at your next step, including agent messages, completion notifications, and user steering. Returns immediately if new input is pending. `timedOut: false` means new input is pending. Pending input is delivered to the model after code execution finishes.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "timeout_ms": {
+          "type": "integer",
+          "description": "Wait duration in milliseconds, from 10000 through 3600000. Defaults to 30000."
+        }
+      }
+    }
+  },
+  {
+    "name": "send_message",
+    "description": "Send a message to an agent. A working agent receives it at its next step; an idle agent starts a new turn with it. Returns delivery confirmation.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "agent": {
+          "type": "string",
+          "description": "The name of another agent in your subagent tree, as shown by list_agents."
+        },
+        "message": {
+          "type": "string",
+          "description": "The message to deliver to the agent."
+        }
+      },
+      "required": [
+        "agent",
+        "message"
+      ]
+    }
+  },
+  {
+    "name": "list_subagent_models",
+    "description": "Inspect the routes available for explicit subagent model selection. No arguments: authorized providers. `provider`: that provider's authorized models. `provider` + `model`: that model and its reasoning efforts. Query when choosing an explicit child route or reasoning effort. Omit optional fields rather than sending empty strings.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "description": "Registered LLM provider id."
+        },
+        "model": {
+          "type": "string",
+          "description": "Exact model id; requires provider."
+        }
+      }
+    }
+  },
+  {
+    "name": "subagent",
+    "description": "Delegate a self-contained task to a subagent (a separate agent that works in its own context) to offload focused, independent work — research, a scoped implementation, an analysis — so it does not consume this conversation's context. The subagent returns its result, not its intermediate steps. This tool starts an independently managed subagent and immediately returns its name. If you are still online when it finishes, the runtime automatically delivers its completion notice. The notice includes the final answer unless the child sent you a message just before finishing. Use `send_message` to steer it while running or continue its conversation after it finishes. Omit `provider`, `model`, and `reasoning_effort` to use child defaults, falling back to compatible parent values.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "cwd": {
+          "type": "string",
+          "description": "Initial child working directory. Relative paths use your current directory; omitted inherits it. Later directory changes in either agent are independent."
+        },
+        "description": {
+          "type": "string",
+          "description": "A short (3-5 word) description of the delegated task, for display. Use the language of the user's current request."
+        },
+        "name": {
+          "type": "string",
+          "description": "Optional short name for the subagent, unique among the subagents you create: lower-case letters, digits, and hyphens, starting with a letter, at most 32 characters; lead is reserved for the root agent. Omitted names default to agent-1, agent-2, and so on."
+        },
+        "prompt": {
+          "type": "string",
+          "description": "The complete, self-contained task for the subagent. It does not share this conversation's context, so include everything it needs."
+        },
+        "provider": {
+          "type": "string",
+          "description": "Child LLM provider id; requires `model`."
+        },
+        "model": {
+          "type": "string",
+          "description": "Model id within that provider; requires `provider`."
+        },
+        "reasoning_effort": {
+          "type": "string",
+          "description": "Reasoning effort id; requires `provider` and `model`. Omit to use the selected model's default, even when it matches the parent or configured route."
+        }
+      },
+      "required": [
+        "description",
+        "prompt"
+      ]
+    }
+  },
+  {
+    "name": "subagent_fork",
+    "description": "Delegate a task to a subagent that inherits this conversation: a child agent seeded with all completed turns so far (it does not see the current in-flight turn). Use this when the subtask builds on this conversation's context — a follow-up analysis, a review, a continuation — without consuming this conversation's context for the work itself. You receive its result, not its intermediate steps. This tool starts an independently managed subagent and immediately returns its name. If you are still online when it finishes, the runtime automatically delivers its completion notice. The notice includes the final answer unless the child sent you a message just before finishing. Use `send_message` to steer it while running or continue its conversation after it finishes.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "cwd": {
+          "type": "string",
+          "description": "Initial child working directory. Relative paths use your current directory; omitted inherits it. Later directory changes in either agent are independent."
+        },
+        "description": {
+          "type": "string",
+          "description": "A short (3-5 word) description of the delegated task, for display. Use the language of the user's current request."
+        },
+        "name": {
+          "type": "string",
+          "description": "Optional short name for the subagent, unique among the subagents you create: lower-case letters, digits, and hyphens, starting with a letter, at most 32 characters; lead is reserved for the root agent. Omitted names default to agent-1, agent-2, and so on."
+        },
+        "prompt": {
+          "type": "string",
+          "description": "The task for the subagent. It already sees this conversation's completed turns, so build on them freely and state only what is new."
+        }
+      },
+      "required": [
+        "description",
+        "prompt"
+      ]
+    }
+  },
+  {
+    "name": "schedule_create",
+    "description": "Create a scheduled task. At each occurrence of rrule, prompt is delivered to the target session as a scheduled message from the user. The result includes the task id and the next occurrence as scheduledAt in UTC and scheduledAtLocal in the zone of rrule. After downtime, only the latest missed occurrence is delivered. Delivery can repeat after a crash.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Task name of at most 120 characters in the user's language: action plus object. Omit timing, status, ids, and bracketed suffixes."
+        },
+        "prompt": {
+          "type": "string",
+          "description": "Instruction delivered at each occurrence."
+        },
+        "rrule": {
+          "type": "string",
+          "description": "Supported RFC 5545 subset: one DTSTART line, a newline, and one RRULE line. DTSTART ends in Z for UTC or carries TZID with an IANA time zone; a fixed offset such as UTC+5 is Etc/GMT-5, with the sign reversed. DTSTART must name an existing local time. A TZID rule keeps local clock time across daylight-saving changes; generated nonexistent local times are skipped, and repeated ones occur once, at the earlier instant. DTSTART may be in the past; delivery starts with the first occurrence after creation. A one-time delivery is RRULE:FREQ=DAILY;COUNT=1. No SECONDLY; BYSECOND takes one value. COUNT is at most 1000; use UNTIL for longer rules. MINUTELY and HOURLY accept no BY parts, so select clock times with DAILY or WEEKLY plus BYHOUR and BYMINUTE. BYMONTHDAY and ordinal BYDAY require MONTHLY or YEARLY; BYYEARDAY and BYWEEKNO require YEARLY. Ordinal BYDAY cannot combine with BYWEEKNO. Each FREQ period allows at most 10080 candidates before BYSETPOS, which accepts at most 31 values. UNTIL is a UTC instant ending in Z. Example: \"DTSTART;TZID=Asia/Singapore:20260901T080000\\nRRULE:FREQ=MONTHLY;BYDAY=MO,TU,WE,TH,FR;BYSETPOS=-1\""
+        },
+        "target": {
+          "type": "string",
+          "description": "this_session delivers to this session; new_once delivers to the same new session every time, opened at the first delivery; new opens a different new session for every delivery. New sessions use this session's working directory and preset. With this_session or new_once, a delivery waits until the previous one finishes, and only the latest occurrence that passed meanwhile is delivered. Use this_session for reminders and for follow-ups to this conversation; use new_once or new for independent work, such as a recurring report, and whenever the user asks for a new conversation.",
+          "enum": [
+            "this_session",
+            "new_once",
+            "new"
+          ]
+        }
+      },
+      "required": [
+        "title",
+        "prompt",
+        "rrule",
+        "target"
+      ]
+    }
+  },
+  {
+    "name": "schedule_list",
+    "description": "List scheduled tasks, including tasks created from other sessions. Active tasks come first, ordered by scheduledAt.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "active": {
+          "type": "boolean",
+          "description": "true for active tasks only; false for paused and ended tasks only; omitted for all tasks."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Page size from 1 to 500; defaults to 100."
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Number of tasks to skip; defaults to 0."
+        }
+      }
+    }
+  },
+  {
+    "name": "schedule_view",
+    "description": "View one scheduled task by id.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Task id."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    }
+  },
+  {
+    "name": "schedule_edit",
+    "description": "Update, pause, resume, or delete one scheduled task by id. Deleting does not retract queued messages.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Task id."
+        },
+        "action": {
+          "type": "string",
+          "description": "update applies the provided fields, at least one; delete removes the task.",
+          "enum": [
+            "update",
+            "delete"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "description": "Task name of at most 120 characters in the user's language: action plus object. Omit timing, status, ids, and bracketed suffixes."
+        },
+        "prompt": {
+          "type": "string",
+          "description": "New instruction delivered at each occurrence."
+        },
+        "rrule": {
+          "type": "string",
+          "description": "New recurrence in the schedule_create rrule format."
+        },
+        "target": {
+          "type": "string",
+          "description": "Omit to retain the destination and its creation settings. Providing target replaces them; new_once reserves a different Session. New targets capture this Session's working directory and preset. Choices are the same as schedule_create.",
+          "enum": [
+            "this_session",
+            "new_once",
+            "new"
+          ]
+        },
+        "active": {
+          "type": "boolean",
+          "description": "false pauses the task; true resumes only if its timing has a future occurrence. Otherwise provide a new rrule."
+        },
+        "expectedUpdatedAt": {
+          "type": "string",
+          "description": "updatedAt from the latest result that returned this task; if the task changed after that result, the result is schedule_conflict and nothing changes."
+        }
+      },
+      "required": [
+        "id",
+        "action"
+      ]
+    }
+  },
+  {
+    "name": "mcp__tavily__search",
+    "description": "Search the web for current information on any topic. Use for news, facts, or data beyond your knowledge cutoff, and before answering any question about specific facts, figures or recent events. Returns snippets and source URLs. Results are short excerpts; read a page with tavily_extract to confirm what it says.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "description": "Search query. Keep it short and specific, in the words the page itself would use; one idea per query.",
+          "type": "string"
+        },
+        "max_results": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The maximum number of search results to return. Ask for 10 when looking for a specific fact, page or entity."
+        },
+        "search_depth": {
+          "anyOf": [
+            {
+              "enum": [
+                "basic",
+                "advanced",
+                "fast",
+                "ultra-fast"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The depth of the search. 'basic' for generic results, 'advanced' for more thorough search, 'fast' for optimized low latency with high relevance, 'ultra-fast' for prioritizing latency above all else. Use 'advanced' when looking for a specific fact, page or entity, or when 'basic' did not find it."
+        },
+        "topic": {
+          "anyOf": [
+            {
+              "enum": [
+                "general",
+                "news"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Search category. Use 'general' for almost all searches, including current events and requests that combine news with other information. Use 'news' only when the user explicitly asks for news, headlines, or news coverage."
+        },
+        "time_range": {
+          "anyOf": [
+            {
+              "enum": [
+                "day",
+                "week",
+                "month",
+                "year"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The time range back from the current date to include in the search results. Filters by when a page was published, not by when the events it describes happened."
+        },
+        "include_images": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Include a list of query-related images in the response"
+        },
+        "include_image_descriptions": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Include a list of query-related images and their descriptions in the response"
+        },
+        "include_raw_content": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Include the cleaned and parsed HTML content of each search result. Whole pages can make the response too large to read; to read one page, use tavily_extract with a query instead."
+        },
+        "include_domains": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A list of domains to specifically include in the search results, if the user asks to search on specific sites set this to the domain of the site. Use full domains such as 'en.wikipedia.org' or 'sec.gov', not suffixes such as 'edu'. This is a hard filter: if results come back empty or thin, search again without it."
+        },
+        "exclude_domains": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "List of domains to specifically exclude, if the user asks to exclude a domain set this to the domain of the site"
+        },
+        "country": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Boost search results from a specific country. Must be a full country name (e.g., 'United States', 'Japan', 'Germany'). ISO country codes (e.g., 'us', 'jp') are not supported. Available only if topic is general. See https://docs.tavily.com/documentation/api-reference/search for the full list of supported countries."
+        },
+        "include_favicon": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Whether to include the favicon URL for each result"
+        },
+        "start_date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Will return all results after the specified start date. Required to be written in the format YYYY-MM-DD. Filters by publish date, not by when events happened; leave it empty when looking for facts about past events."
+        },
+        "end_date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Will return all results before the specified end date. Required to be written in the format YYYY-MM-DD. Filters by publish date, not by when events happened; leave it empty when looking for facts about past events."
+        },
+        "exact_match": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Only return results containing the exact phrase(s) in quotes in your query"
+        },
+        "include_published_date": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Include detected publication dates (beta)"
+        },
+        "filter_by_published_date": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Filter results to the requested date window and exclude results with no detected publication date"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "mcp__tavily__extract",
+    "description": "Extract content from URLs. Returns raw page content in markdown or text format. Use it to read a page in full or to confirm a fact found in search results. Pages that could not be read are listed in failed_results; retry a timeout once, then try another source.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "urls": {
+          "description": "List of URLs to extract content from. Prefer URLs from search results; guessed page URLs often fail.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "extract_depth": {
+          "default": "basic",
+          "description": "Use 'advanced' for LinkedIn, protected sites, or tables/embedded content",
+          "enum": [
+            "basic",
+            "advanced"
+          ],
+          "type": "string"
+        },
+        "include_images": {
+          "default": false,
+          "description": "Include images from pages",
+          "type": "boolean"
+        },
+        "format": {
+          "default": "markdown",
+          "description": "Output format",
+          "enum": [
+            "markdown",
+            "text"
+          ],
+          "type": "string"
+        },
+        "include_favicon": {
+          "default": false,
+          "description": "Include favicon URLs",
+          "type": "boolean"
+        },
+        "query": {
+          "default": "",
+          "description": "Query to rerank content chunks by relevance. Set it to get only the relevant passages of a long article or PDF. Leave it empty for tables, lists, data files and API responses, which it can cut short; read those whole, or request a narrower URL.",
+          "type": "string"
+        },
+        "include_usage": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Include credit usage"
+        }
+      },
+      "required": [
+        "urls"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "mcp__tavily__crawl",
+    "description": "Crawl a website starting from a URL. Extracts content from pages with configurable depth and breadth.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "description": "The root URL to begin the crawl",
+          "type": "string"
+        },
+        "max_depth": {
+          "default": 1,
+          "description": "Max depth of the crawl. Defines how far from the base URL the crawler can explore.",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_breadth": {
+          "default": 20,
+          "description": "Max number of links to follow per level of the tree (i.e., per page)",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "limit": {
+          "default": 50,
+          "description": "Total number of links the crawler will process before stopping",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "instructions": {
+          "default": "",
+          "description": "Natural language instructions for the crawler. Instructions specify which types of pages the crawler should return.",
+          "type": "string"
+        },
+        "select_paths": {
+          "default": [],
+          "description": "Regex patterns to select only URLs with specific path patterns (e.g., /docs/.*, /api/v1.*)",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "select_domains": {
+          "default": [],
+          "description": "Regex patterns to restrict crawling to specific domains or subdomains (e.g., ^docs\\.example\\.com$)",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "allow_external": {
+          "default": true,
+          "description": "Whether to return external links in the final response",
+          "type": "boolean"
+        },
+        "extract_depth": {
+          "default": "basic",
+          "description": "Advanced extraction retrieves more data, including tables and embedded content, with higher success but may increase latency",
+          "enum": [
+            "basic",
+            "advanced"
+          ],
+          "type": "string"
+        },
+        "format": {
+          "default": "markdown",
+          "description": "The format of the extracted web page content. markdown returns content in markdown format. text returns plain text and may increase latency.",
+          "enum": [
+            "markdown",
+            "text"
+          ],
+          "type": "string"
+        },
+        "include_favicon": {
+          "default": false,
+          "description": "Whether to include the favicon URL for each result",
+          "type": "boolean"
+        },
+        "include_usage": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Include credit usage"
+        },
+        "chunks_per_source": {
+          "anyOf": [
+            {
+              "maximum": 5,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Chunks per source; requires instructions"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "mcp__tavily__map",
+    "description": "Map a website's structure. Returns a list of URLs found starting from the base URL.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "description": "The root URL to begin the mapping",
+          "type": "string"
+        },
+        "max_depth": {
+          "default": 1,
+          "description": "Max depth of the mapping. Defines how far from the base URL the crawler can explore",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_breadth": {
+          "default": 20,
+          "description": "Max number of links to follow per level of the tree (i.e., per page)",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "limit": {
+          "default": 50,
+          "description": "Total number of links the crawler will process before stopping",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "instructions": {
+          "default": "",
+          "description": "Natural language instructions for the crawler",
+          "type": "string"
+        },
+        "select_paths": {
+          "default": [],
+          "description": "Regex patterns to select only URLs with specific path patterns (e.g., /docs/.*, /api/v1.*)",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "select_domains": {
+          "default": [],
+          "description": "Regex patterns to restrict crawling to specific domains or subdomains (e.g., ^docs\\.example\\.com$)",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "allow_external": {
+          "default": true,
+          "description": "Whether to return external links in the final response",
+          "type": "boolean"
+        },
+        "include_usage": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Include credit usage"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "additionalProperties": false
+    }
+  }
+]
