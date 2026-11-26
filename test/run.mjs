@@ -334,6 +334,24 @@ console.log('')
   assert.equal(value.description, 'Execute a shell command and return stdout/stderr.')
   assert.deepEqual(value.template, { description: '', command: '' })
   assert.deepEqual(value.arg, { command: 'ls -la', description: 'List files' })
+
+  const indexSdk = plugin.renderCompactSdk([bashDefinition, webDefinition], { sdkStyle: 'index' })
+  assert.ok(indexSdk.includes('## Tools'))
+  assert.ok(indexSdk.includes('web_search: Search the web.'))
+  assert.ok(!indexSdk.includes('declare const tools'))
+  const fullIndex = plugin.renderCompactSdk([bashDefinition, webDefinition], { sdkStyle: 'index', fullDescriptions: true })
+  assert.ok(fullIndex.includes('web_search: Search the web. Returns results.'))
+
+  const { ctx: toolCtx } = harness()
+  const toolExecutor = new plugin.RunCodeItselfExecutor(toolCtx, { promptMode: 'tool' })
+  const toolSchema = toolExecutor.describe([bashDefinition, webDefinition]).schemas[0]
+  assert.ok(toolSchema.description.includes('## Code-Data Separation'))
+  assert.ok(toolSchema.description.includes('## Tools'))
+  assert.ok(toolSchema.description.includes('Search the web. Returns results.'))
+  assert.ok(!toolSchema.description.includes('declare const tools'))
+  assert.equal(toolExecutor.sections.length, 1)
+  console.log('prompt modes: index SDK and tool-description mode')
+
   console.log('subtools: description and full template preloaded; only run_code_itself and run_code_subtools')
 }
 console.log('All checks passed')

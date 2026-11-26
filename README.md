@@ -106,7 +106,7 @@ The system prompt renders a compact SDK with full TypeScript declarations for th
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # or a packed tarball:
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.4.3.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.4.4.tgz
 ```
 
 Or use **Plugins → Add plugin** in the DSH Web UI and point it at the directory or tarball. The CLI only installs the package; the Web UI also selects the bundle (its patch is empty, so this only affects the Plugins listing).
@@ -142,10 +142,11 @@ Restart DSH (or create a new session) after either change.
 
 `RunCodeItselfExecutor` extends DSH's `PtcExecutor` and wraps only the reserved `run_code` transport:
 
-- `describe()` appends the extra-fields contract to the tool description and sets `additionalProperties: true`;
-- `execute()` prepends one declaration to the program and hands it to the standard transport:
+- `describe()` adds the extra-fields note and, in `promptMode: tool`, the Code-Data guide to the tool description, and sets `additionalProperties: true`;
+- `execute()` prepends two declarations to the program and hands it to the standard transport:
 
   ```js
+  const run_code_subtools = { ...description and template per tool... };
   const run_code_itself = { ...the complete tool-call arguments... };
   ```
 
@@ -164,6 +165,39 @@ If a future DSH version changes the internal `requirePtcTransport` hook, the plu
 |---|---|---|
 | `maxSubCallsPerMinute` | inherited from the replaced PTC executor | Nested tool-call attempts per minute of `run_code` timeout |
 | `maxParallelSubCalls` | inherited from the replaced PTC executor | Maximum overlapping concurrency-safe program subcalls |
+| `promptMode` | `system` | `system` keeps the Code-Data guide in the SDK section; `tool` appends it to the `run_code` tool description |
+| `sdkStyle` | `declarations` | `declarations` renders the TypeScript SDK; `index` renders a compact tool index without PTC-style declarations |
+
+### Prompt placement experiment
+
+The system SDK is literally a PTC declaration block, which can prime a model to write `tools.x({...})` inline. To isolate that influence, test in a **copy** of the preset:
+
+1. Set the persona to a minimal complete prompt:
+
+```yaml
+- id: persona
+  name: '@deepseek-ai/dsh-persona'
+  config:
+    prefix: |
+      You are a helpful assistant. Use run_code for every action.
+      Follow the Code-Data Separation rules and tool list in the run_code tool description.
+    complete: true
+    includeRuntimeContext: false
+```
+
+2. Move the guide into the tool description and drop the SDK declarations:
+
+```yaml
+- id: run-code-itself
+  name: 'dsh-run-code-itself'
+  config:
+    promptMode: tool
+    sdkStyle: index
+```
+
+3. Start a new session and try “随便调用一下”.
+
+`complete: true` suppresses **every other system section**, including AGENTS.md, skills, runtime context, and the PTC-only instruction. This is an experiment, not a recommended production configuration. If it fails, the PTC SDK is not the whole story; if it works, step back to `sdkStyle: index` alone, then to normal `promptMode: system`.
 
 ## Limitations
 

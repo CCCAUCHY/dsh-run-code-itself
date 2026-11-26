@@ -97,7 +97,7 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # 或 tgz：
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.4.3.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.4.4.tgz
 ```
 
 也可以在 **插件** 页面选择 **添加插件**，指向目录或 tgz。命令行只安装包；UI 的 **添加插件** 还会把 bundle 选进 profile（bundle 的补丁是空的，所以只影响插件页的显示）。
@@ -135,10 +135,43 @@ bundle 自带的 `cordis.patch.yml` 是**空的**：安装只会把包装进 pro
 |---|---|---|
 | `maxSubCallsPerMinute` | 继承被替换的 PTC 执行器 | 程序内每分钟允许的嵌套工具调用次数 |
 | `maxParallelSubCalls` | 继承被替换的 PTC 执行器 | 并发安全的嵌套调用上限 |
+| `promptMode` | `system` | `system` 把 Code-Data 指南放在 SDK 段；`tool` 把它追加到 `run_code` 工具描述 |
+| `sdkStyle` | `declarations` | `declarations` 渲染 TypeScript SDK；`index` 渲染紧凑工具索引，不含 PTC 风格声明 |
+
+### 提示词位置实验
+
+系统提示词里的 SDK 本质上是一段 PTC 声明，可能诱导模型直接写 `tools.x({...})`。隔离这个因素时，在**预设副本**里测试：
+
+1. persona 改成最小 complete 提示词：
+
+```yaml
+- id: persona
+  name: '@deepseek-ai/dsh-persona'
+  config:
+    prefix: |
+      You are a helpful assistant. Use run_code for every action.
+      Follow the Code-Data Separation rules and tool list in the run_code tool description.
+    complete: true
+    includeRuntimeContext: false
+```
+
+2. 把指南移进工具描述，并去掉 SDK 声明：
+
+```yaml
+- id: run-code-itself
+  name: 'dsh-run-code-itself'
+  config:
+    promptMode: tool
+    sdkStyle: index
+```
+
+3. 新建会话，试“随便调用一下”。
+
+`complete: true` 会屏蔽**所有其他系统提示词段**，包括 AGENTS.md、技能、运行时上下文和 PTC-only 说明。这是实验配置，不建议直接用于生产。如果仍然失败，说明 PTC SDK 不是全部原因；如果成功，再回退到只开 `sdkStyle: index`，最后再恢复 `promptMode: system`。
 
 ## 实现与限制
 
-- 插件只替换 `run_code` 传输的 `execute` 与 `describe`：把参数对象写进程序开头的 `const run_code_itself = …` 声明，并在 schema 中打开 `additionalProperties`。校验、嵌套调用调度、审批、沙箱、结果渲染仍由标准 PTC 执行器负责。
+- 插件只替换 `run_code` 传输的 `execute` 与 `describe`：在程序开头注入 `run_code_subtools` 和 `run_code_itself` 两个声明，并在 schema 中打开 `additionalProperties`。校验、嵌套调用调度、审批、沙箱、结果渲染仍由标准 PTC 执行器负责。
 - Host 行在 `agent/created` 时为该 Agent 安装一个继承标准 `PtcExecutor` 的 Agent 作用域执行器；preset 行则直接在 preset 作用域注册同一个执行器。
 - 声明行按 JSON 字面量生成；含 `__proto__` 键的载荷改用 `JSON.parse` 还原，U+2028/U+2029 会被转义。
 - 程序源码里会多一行声明；用户代码的错误行号会比原始 `code` 偏移一行。

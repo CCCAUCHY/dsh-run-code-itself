@@ -22,6 +22,12 @@ export const Config = z.object({
   maxParallelSubCalls: z.natural().min(1).description(
     'Maximum overlapping concurrency-safe program subcalls for this executor; inherits the replaced PTC executor when omitted.',
   ),
+  promptMode: z.union(['system', 'tool']).default('system').description(
+    'Where to put the Code-Data Separation guide: the system prompt SDK section or the run_code tool description.',
+  ),
+  sdkStyle: z.union(['declarations', 'index']).default('declarations').description(
+    'System-prompt SDK style: TypeScript declarations or a compact tool index without PTC-like declarations.',
+  ),
 })
 
 /** The program-visible preset variable. */
@@ -30,7 +36,7 @@ export const RUN_CODE_ITSELF = 'run_code_itself'
 /** Tools whose full definitions stay in the system prompt. */
 const COMMON_TOOLS = new Set(['bash', 'read', 'write', 'edit', 'glob', 'grep'])
 
-/** Short note appended to the run_code description; the hard rules live in the system prompt. */
+/** Short note appended to the run_code description. */
 const TOOL_NOTE = '\n\nExtra top-level sibling fields are allowed and become parsed values on run_code_itself.'
 
 /** True for the argument object shape a JSON tool call can produce. */
@@ -115,9 +121,8 @@ function docText(text) {
   return (typeof text === 'string' ? text : '').replace(/\*\//g, '* /').replace(/\s+/g, ' ').trim()
 }
 
-export function renderCompactSdk(tools) {
-  const common = tools.filter(tool => COMMON_TOOLS.has(tool.name))
-  const other = tools.filter(tool => !COMMON_TOOLS.has(tool.name))
+export function renderCompactSdk(tools, options = {}) {
+  const sdkStyle = options.sdkStyle ?? 'declarations'
   const lines = [
     '## Code-Data Separation',
     '',
@@ -137,38 +142,9 @@ export function renderCompactSdk(tools) {
     '',
     'Do not JSON.stringify or JSON.parse sibling values; do not declare run_code_itself or run_code_subtools.',
     '',
-    '## SDK',
-    '',
-    'type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue }',
-    '',
-    'declare const run_code_itself: {',
-    '  code: string;',
-    '  description: string;',
-    '  [key: string]: JsonValue;',
-    '}',
-    '',
-    'declare const run_code_subtools: Record<string, {',
-    '  description: string;',
-    '  template: Record<string, JsonValue>;',
-    '}>',
-    '',
-    'interface ToolArgsMap {',
   ]
-  for (const tool of common) {
-    const description = docText(tool.description)
-    if (description !== '') lines.push('  /** ' + description + ' */')
-    const parameters = isObjectRecord(tool.parameters) ? tool.parameters : { type: 'object', properties: {} }
-    lines.push('  ' + JSON.stringify(tool.name) + ': ' + jsonSchemaToTs(parameters) + ';')
-  }
-  lines.push('}', '', 'interface ToolOutputMap {')
-  for (const tool of common) {
-    const output = tool.output !== undefined && isObjectRecord(tool.output.schema) ? tool.output.schema : {}
-    lines.push('  ' + JSON.stringify(tool.name) + ': ' + jsonSchemaToTs(output) + ';')
-  }
-  lines.push(
-    '}',
-    '',
-    'declare const tools: { [K in keyof ToolArgsMap]: (args: ToolArgsMap[K]) => Promise<ToolOutputMap[K]> }',
+  const examples = [
+    '## Examples',
     '',
     '// Sibling field:',
     '// run_code({',
@@ -185,6 +161,52 @@ export function renderCompactSdk(tools) {
     '//   command: "ls -la",',
     '// })',
     '',
+  ]
+  if (sdkStyle === 'index') {
+    lines.push('## Tools', '', 'All tools are callable as await tools.name(args). run_code_subtools.<tool> has the full description and template.', '')
+    for (const tool of tools) {
+      lines.push('- ' + tool.name + ': ' + (options.fullDescriptions ? docText(tool.description) : firstSentence(tool.description)))
+    }
+    lines.push('', ...examples)
+    return lines.join('\n')
+  }
+  const common = tools.filter(tool => COMMON_TOOLS.has(tool.name))
+  const other = tools.filter(tool => !COMMON_TOOLS.has(tool.name))
+  lines.push(
+    '## SDK',
+    '',
+    'type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue }',
+    '',
+    'declare const run_code_itself: {',
+    '  code: string;',
+    '  description: string;',
+    '  [key: string]: JsonValue;',
+    '}',
+    '',
+    'declare const run_code_subtools: Record<string, {',
+    '  description: string;',
+    '  template: Record<string, JsonValue>;',
+    '}>',
+    '',
+    'interface ToolArgsMap {',
+  )
+  for (const tool of common) {
+    const description = docText(tool.description)
+    if (description !== '') lines.push('  /** ' + description + ' */')
+    const parameters = isObjectRecord(tool.parameters) ? tool.parameters : { type: 'object', properties: {} }
+    lines.push('  ' + JSON.stringify(tool.name) + ': ' + jsonSchemaToTs(parameters) + ';')
+  }
+  lines.push('}', '', 'interface ToolOutputMap {')
+  for (const tool of common) {
+    const output = tool.output !== undefined && isObjectRecord(tool.output.schema) ? tool.output.schema : {}
+    lines.push('  ' + JSON.stringify(tool.name) + ': ' + jsonSchemaToTs(output) + ';')
+  }
+  lines.push(
+    '}',
+    '',
+    'declare const tools: { [K in keyof ToolArgsMap]: (args: ToolArgsMap[K]) => Promise<ToolOutputMap[K]> }',
+    '',
+    ...examples,
     '## Other tools',
     '',
     'These tools are callable but not declared in the compact SDK. Print run_code_subtools.<tool> for its full description and template:',
@@ -208,16 +230,21 @@ export class RunCodeItselfExecutor extends PtcExecutor {
    * @param config - validated program limits.
    */
   constructor(ctx, config) {
-    super(ctx, config)
+    const { promptMode = 'system', sdkStyle = 'declarations', ...limits } = config ?? {}
+    super(ctx, limits)
+    this.promptMode = promptMode
+    this.sdkStyle = sdkStyle
     const sections = this.sections
-    if (sections.length > 1) {
+    if (promptMode === 'tool') {
+      this.sections = [sections[0]]
+    } else if (sections.length > 1) {
       this.sections = [
         sections[0],
         {
           name: sections[1].name,
           order: sections[1].order,
           interpolate: false,
-          text: tools => renderCompactSdk(tools),
+          text: tools => renderCompactSdk(tools, { sdkStyle: this.sdkStyle }),
         },
       ]
     }
@@ -247,6 +274,7 @@ export class RunCodeItselfExecutor extends PtcExecutor {
    */
   describe(tools) {
     const description = super.describe(tools)
+    const guide = this.promptMode === 'tool' ? renderCompactSdk(tools, { sdkStyle: 'index', fullDescriptions: true }) : ''
     return {
       ...description,
       schemas: description.schemas.map(schema => {
@@ -254,9 +282,12 @@ export class RunCodeItselfExecutor extends PtcExecutor {
         const parameters = schema.parameters
         const properties = isObjectRecord(parameters.properties) ? parameters.properties : {}
         const code = isObjectRecord(properties.code) ? properties.code : undefined
+        const base = this.promptMode === 'tool'
+          ? schema.description.replace('per the declarations in the system prompt', 'using the tool list and rules in this description')
+          : schema.description
         return {
           ...schema,
-          description: schema.description + TOOL_NOTE,
+          description: base + TOOL_NOTE + (guide === '' ? '' : '\n\n' + guide),
           parameters: {
             ...parameters,
             additionalProperties: true,
@@ -311,6 +342,8 @@ function executorConfig(settings, inherited) {
   const maxParallel = settings.maxParallelSubCalls ?? inherited.maxParallelSubCalls
   if (maxSubCalls !== undefined) config.maxSubCallsPerMinute = maxSubCalls
   if (maxParallel !== undefined) config.maxParallelSubCalls = maxParallel
+  if (settings.promptMode !== undefined) config.promptMode = settings.promptMode
+  if (settings.sdkStyle !== undefined) config.sdkStyle = settings.sdkStyle
   return config
 }
 
