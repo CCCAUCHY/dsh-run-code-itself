@@ -50,7 +50,13 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 {"code":"return run_code_templates.bash","description":"查看 bash 模板"}
 ```
 
-结果可以直接作为嵌套兄弟字段，填上空值即可：
+结果：
+
+```json
+{"description":"Execute a shell command and return stdout/stderr.","command":""}
+```
+
+下面的示例就是同一个对象，只把 `command` 从空值填成 `ls -la`，键名完全一致：
 
 ```json
 {"code":"return await tools.bash(run_code_itself.bash)","description":"列文件","bash":{"description":"Execute a shell command and return stdout/stderr.","command":"ls -la"}}
@@ -60,7 +66,7 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 
 ## 按需工具文档
 
-系统提示词里渲染一份紧凑 SDK：常用工具（`bash`、`read`、`write`、`edit`、`glob`、`grep`）有完整 TypeScript 声明，其余可见工具只列名字和一句话描述。所有工具仍然可调用；对未展开的工具，先打印最小模板拿到必填字段，再用 `tools.name` 和嵌套兄弟字段调用。
+系统提示词里渲染一份紧凑 SDK：常用工具（`bash`、`read`、`write`、`edit`、`glob`、`grep`）有完整 TypeScript 声明，其余可见工具列在描述索引里。没有 `description` 参数的工具，索引里放完整描述；有 `description` 参数的工具，完整描述在模板里，索引只放一句话摘要。所有工具仍然可调用；对未展开的工具，先打印最小模板拿到必填字段，再用 `tools.name` 和嵌套兄弟字段调用。
 
 ## 元编程
 
@@ -71,7 +77,7 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # 或 tgz：
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.3.1.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.3.2.tgz
 ```
 
 也可以在 **插件** 页面选择 **添加插件**，指向目录或 tgz。命令行只安装包；UI 的 **添加插件** 还会把 bundle 选进 profile（bundle 的补丁是空的，所以只影响插件页的显示）。

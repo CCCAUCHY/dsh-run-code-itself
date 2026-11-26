@@ -159,10 +159,11 @@ export function renderCompactSdk(tools) {
     'declare const tools: { [K in keyof ToolArgsMap]: (args: ToolArgsMap[K]) => Promise<ToolOutputMap[K]> }',
     '',
     '// Code-Data Separation example:',
+    '// The bash object is run_code_templates.bash with command filled:',
     '// run_code({',
     '//   code: "return await tools.bash(run_code_itself.bash)",',
     '//   description: "List files",',
-    '//   bash: { command: "ls -la", description: "List files" },',
+    '//   bash: { description: "Execute a shell command and return stdout/stderr.", command: "ls -la" },',
     '// })',
     '',
     '## Other tools',
@@ -170,7 +171,12 @@ export function renderCompactSdk(tools) {
     'These tools are callable but not declared in the compact SDK. Print their template for the required argument fields:',
     '',
   )
-  for (const tool of other) lines.push('- ' + tool.name + ': ' + firstSentence(tool.description))
+  for (const tool of other) {
+    const hasDescriptionParam = isObjectRecord(tool.parameters)
+      && isObjectRecord(tool.parameters.properties)
+      && Object.prototype.hasOwnProperty.call(tool.parameters.properties, 'description')
+    lines.push('- ' + tool.name + ': ' + (hasDescriptionParam ? firstSentence(tool.description) : docText(tool.description)))
+  }
   return lines.join('\n')
 }
 

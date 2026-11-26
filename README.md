@@ -54,7 +54,13 @@ Every visible tool's template is preloaded in `run_code_templates` as a minimal 
 {"code":"return run_code_templates.bash","description":"Read the bash template"}
 ```
 
-The result is directly usable as the nested sibling field; fill the empty values:
+Result:
+
+```json
+{"description":"Execute a shell command and return stdout/stderr.","command":""}
+```
+
+The example below is exactly this object with `command` filled to `ls -la`; the keys are identical:
 
 ```json
 {"code":"return await tools.bash(run_code_itself.bash)","description":"List files","bash":{"description":"Execute a shell command and return stdout/stderr.","command":"ls -la"}}
@@ -64,7 +70,7 @@ The result is directly usable as the nested sibling field; fill the empty values
 
 ## On-demand tool documentation
 
-The system prompt renders a compact SDK with full TypeScript declarations for the common tools (`bash`, `read`, `write`, `edit`, `glob`, `grep`) and a name/description index for all other visible tools. Every tool remains callable; for a hidden tool, print its minimal template first to get the required fields, then call it with `tools.name` and a nested sibling field.
+The system prompt renders a compact SDK with full TypeScript declarations for the common tools (`bash`, `read`, `write`, `edit`, `glob`, `grep`) and a description index for all other visible tools. Tools without a `description` argument show their full description in that index; tools that have one carry the full description in their template and the index shows a one-line summary. Every tool remains callable; for a hidden tool, print its minimal template first to get the required fields, then call it with `tools.name` and a nested sibling field.
 
 ## Metaprogramming
 
@@ -80,7 +86,7 @@ The system prompt renders a compact SDK with full TypeScript declarations for th
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # or a packed tarball:
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.3.1.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.3.2.tgz
 ```
 
 Or use **Plugins → Add plugin** in the DSH Web UI and point it at the directory or tarball. The CLI only installs the package; the Web UI also selects the bundle (its patch is empty, so this only affects the Plugins listing).

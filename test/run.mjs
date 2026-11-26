@@ -278,6 +278,17 @@ console.log('')
     description: 'Execute a shell command and return stdout/stderr.',
     command: '',
   })
+  const readDefinition = {
+    name: 'read',
+    description: 'Read a UTF-8 text file and return line-numbered content.',
+    parameters: {
+      type: 'object',
+      properties: { file_path: { type: 'string' }, offset: { type: 'number' } },
+      required: ['file_path'],
+    },
+    output: { schema: {} },
+  }
+  assert.deepEqual({ ...plugin.buildTemplates([readDefinition]).read }, { file_path: '' })
 
   const webDefinition = { name: 'web_search', description: 'Search the web. Returns results.', parameters: {}, output: { schema: {} } }
   const sdk = plugin.renderCompactSdk([bashDefinition, webDefinition])
@@ -286,7 +297,8 @@ console.log('')
   assert.ok(sdk.includes('declare const run_code_itself'))
   assert.ok(sdk.includes('interface ToolArgsMap'))
   assert.ok(sdk.includes('tools.bash(run_code_itself.bash)'))
-  assert.ok(sdk.includes('web_search: Search the web.'))
+  assert.ok(sdk.includes('web_search: Search the web. Returns results.'))
+  assert.ok(!sdk.includes('web_search: Search the web.\n'))
   assert.ok(sdk.includes('run_code_templates'))
 
   const { ctx, programs, tools } = harness()
