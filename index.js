@@ -55,8 +55,8 @@ export function declarationFor(payload) {
   return 'const ' + RUN_CODE_ITSELF + ' = ' + jsonLiteral(payload) + ';'
 }
 
-/** Placeholder value for one JSON Schema property. */
-function sampleValue(property) {
+/** Empty placeholder for one JSON Schema property. */
+function emptyValue(property) {
   if (Object.prototype.hasOwnProperty.call(property, 'const')) return property.const
   if (Array.isArray(property.enum) && property.enum.length > 0) return property.enum[0]
   switch (property.type) {
@@ -70,46 +70,27 @@ function sampleValue(property) {
   }
 }
 
-/** TypeScript call signature for one tool definition. */
-function signatureFor(definition) {
-  const parameters = isObjectRecord(definition.parameters) ? definition.parameters : { type: 'object', properties: {} }
-  const output = definition.output !== undefined && isObjectRecord(definition.output.schema)
-    ? definition.output.schema : {}
-  return 'tools.' + definition.name + '(args: ' + jsonSchemaToTs(parameters) + '): Promise<' + jsonSchemaToTs(output) + '>'
-}
-
 /**
- * Build one argument template per visible tool, including its description,
- * call signature, parameter schema, and output schema.
+ * Build the minimal argument template for each visible tool: all required
+ * fields present with empty placeholders, and the full tool description in
+ * the description property when the tool has one.
  * @param definitions - visible tool definitions.
- * @returns templates keyed by tool name.
+ * @returns minimal argument objects keyed by tool name.
  */
 export function buildTemplates(definitions) {
   const templates = Object.create(null)
   for (const definition of definitions) {
     const parameters = isObjectRecord(definition.parameters) ? definition.parameters : {}
     const properties = isObjectRecord(parameters.properties) ? parameters.properties : {}
-    const keys = Object.keys(properties)
-    const required = Array.isArray(parameters.required) ? parameters.required.slice() : []
-    const sample = Object.create(null)
-    const defaults = Object.create(null)
-    for (const key of keys) {
+    const required = Array.isArray(parameters.required) ? parameters.required : []
+    const template = Object.create(null)
+    const hasDescription = Object.prototype.hasOwnProperty.call(properties, 'description')
+    if (hasDescription) template.description = definition.description === undefined ? '' : String(definition.description)
+    for (const key of required) {
+      if (key === 'description' && hasDescription) continue
       const property = properties[key]
-      if (!isObjectRecord(property)) continue
-      sample[key] = sampleValue(property)
-      if (Object.prototype.hasOwnProperty.call(property, 'default')) defaults[key] = property.default
+      template[key] = isObjectRecord(property) ? emptyValue(property) : ''
     }
-    const output = definition.output === undefined ? undefined : definition.output.schema
-    const template = {
-      description: definition.description === undefined ? '' : String(definition.description),
-      signature: signatureFor(definition),
-      keys,
-      required,
-      sample,
-      parameters,
-    }
-    if (output !== undefined) template.output = output
-    if (Object.keys(defaults).length > 0) template.defaults = defaults
     templates[definition.name] = template
   }
   return templates
@@ -142,12 +123,12 @@ export function renderCompactSdk(tools) {
     'This runtime separates code from data. code is program logic; data and subtool arguments are sibling JSON fields of the run_code call, read inside the program as parsed values on run_code_itself.',
     '',
     '1. **Subtool JSON MUST be a sibling field.** Put the argument object in a field named after the tool (bash, read, ...) and call tools.bash(run_code_itself.bash). Never write tools.x({...}) inline, regardless of payload size.',
-    '2. **Escape-prone values MUST be sibling fields:** multi-line text, regex or paths with backslashes, JSON arrays/objects, templates.',
-    '3. **Other values:** use a sibling field when it reduces escaping or is long; simple literals, numbers, status strings, and control flow stay in code.',
+    '2. **Minimize escaping inside code.** code is a JSON string; every quote, backslash, or newline inside it needs escaping. Move a value into a sibling field when that reduces escaping in code; keep it inline when inlining costs nothing extra.',
+    '3. **Decide by actual escaping cost, not by type or size.** A short value may stay inline; a multiline string, JSON structure, or subtool arguments belong in a field. Rule 1 always applies to subtool JSON.',
     '',
     'Do not JSON.stringify or JSON.parse sibling values; do not declare run_code_itself.',
     '',
-    'All tool templates are preloaded in run_code_templates; print run_code_templates.<tool> for its description, signature, parameters, output, and sample.',
+    'All tool templates are preloaded in run_code_templates as minimal argument objects: every required field is present, values are empty, and the description property (when the tool has one) contains the full tool description. Fill the values and pass the object as the tool sibling field; print run_code_templates.<tool> to see it.',
     '',
     '## SDK',
     '',
@@ -186,7 +167,7 @@ export function renderCompactSdk(tools) {
     '',
     '## Other tools',
     '',
-    'These tools are callable but not declared in the compact SDK. Print their template for signature, parameters, and output:',
+    'These tools are callable but not declared in the compact SDK. Print their template for the required argument fields:',
     '',
   )
   for (const tool of other) lines.push('- ' + tool.name + ': ' + firstSentence(tool.description))

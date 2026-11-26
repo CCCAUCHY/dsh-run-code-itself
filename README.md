@@ -38,7 +38,7 @@ The model-facing `run_code` schema is open (`additionalProperties: true`). The h
 
 Inside `code`, the same payload needs a JavaScript literal and a second escaping layer for the `code` string. An extra field has only the outer JSON layer, and the program receives the parsed value directly.
 
-This applies regardless of payload size: even a single path, command, regex, or small object belongs in an extra field when it is a subtool argument. Keep control flow, loop bounds, simple numbers, short status strings, and inline logic directly in `code`.
+The goal is to minimize escaping inside `code`, not to classify values by type. If inlining a value needs quotes, backslashes, newlines, `JSON.stringify`/`JSON.parse`, or a large literal, put it in a sibling field; simple values can stay inline. Subtool JSON always goes in a sibling field.
 
 Prepare nested tool arguments the same way:
 
@@ -48,23 +48,23 @@ Prepare nested tool arguments the same way:
 
 ## Tool templates
 
-Every visible tool's template is preloaded in `run_code_templates`. It contains the tool description, TypeScript call signature, parameter schema (with per-property descriptions), output schema, keys, required fields, and a sample. Print one:
+Every visible tool's template is preloaded in `run_code_templates` as a minimal argument object: all required fields, empty placeholders, and the full tool description in the `description` property when the tool has one. Print one:
 
 ```json
 {"code":"return run_code_templates.bash","description":"Read the bash template"}
 ```
 
-Use the template's keys to build the nested sibling field; no extra syntax:
+The result is directly usable as the nested sibling field; fill the empty values:
 
 ```json
-{"code":"return await tools.bash(run_code_itself.bash)","description":"List files","bash":{"command":"ls -la","description":"List files"}}
+{"code":"return await tools.bash(run_code_itself.bash)","description":"List files","bash":{"description":"Execute a shell command and return stdout/stderr.","command":"ls -la"}}
 ```
 
 `run_code_templates` is a preloaded variable alongside `run_code_itself`.
 
 ## On-demand tool documentation
 
-The system prompt renders a compact SDK with full TypeScript declarations for the common tools (`bash`, `read`, `write`, `edit`, `glob`, `grep`) and a name/description index for all other visible tools. Every tool remains callable; for a hidden tool, print its template first to get the signature, parameters, and output, then call it with `tools.name` and a nested sibling field.
+The system prompt renders a compact SDK with full TypeScript declarations for the common tools (`bash`, `read`, `write`, `edit`, `glob`, `grep`) and a name/description index for all other visible tools. Every tool remains callable; for a hidden tool, print its minimal template first to get the required fields, then call it with `tools.name` and a nested sibling field.
 
 ## Metaprogramming
 
@@ -80,7 +80,7 @@ The system prompt renders a compact SDK with full TypeScript declarations for th
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # or a packed tarball:
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.3.0.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.3.1.tgz
 ```
 
 Or use **Plugins → Add plugin** in the DSH Web UI and point it at the directory or tarball. The CLI only installs the package; the Web UI also selects the bundle (its patch is empty, so this only affects the Plugins listing).

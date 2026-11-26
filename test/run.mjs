@@ -274,18 +274,15 @@ console.log('')
     },
   }
   const templates = plugin.buildTemplates([bashDefinition])
-  assert.deepEqual(templates.bash.keys, ['description', 'command', 'timeoutMs'])
-  assert.deepEqual(templates.bash.required, ['description', 'command'])
-  assert.equal(templates.bash.sample.command, '')
-  assert.equal(templates.bash.sample.timeoutMs, 0)
-  assert.deepEqual(templates.bash.parameters.required, ['description', 'command'])
-  assert.ok(templates.bash.signature.startsWith('tools.bash(args: '))
-  assert.ok(templates.bash.signature.includes('Promise<'))
-  assert.equal(templates.bash.output.properties.exitCode.type, 'number')
+  assert.deepEqual({ ...templates.bash }, {
+    description: 'Execute a shell command and return stdout/stderr.',
+    command: '',
+  })
 
   const webDefinition = { name: 'web_search', description: 'Search the web. Returns results.', parameters: {}, output: { schema: {} } }
   const sdk = plugin.renderCompactSdk([bashDefinition, webDefinition])
   assert.ok(sdk.includes('## Code-Data Separation'))
+  assert.ok(sdk.includes('**Minimize escaping inside code.**'))
   assert.ok(sdk.includes('declare const run_code_itself'))
   assert.ok(sdk.includes('interface ToolArgsMap'))
   assert.ok(sdk.includes('tools.bash(run_code_itself.bash)'))
@@ -299,7 +296,7 @@ console.log('')
   executor.programs = programs
   const transport = executor.requirePtcTransport()
   await transport.execute({
-    code: 'return { keys: run_code_templates.bash.keys, arg: run_code_itself.bash }',
+    code: 'return { template: run_code_templates.bash, arg: run_code_itself.bash }',
     description: 'Template test',
     bash: { command: 'ls -la', description: 'List files' },
   }, toolExec())
@@ -309,7 +306,7 @@ console.log('')
   assert.ok(!program.includes('run_code_call'))
   const fn = new AsyncFunction(program)
   const value = await fn()
-  assert.deepEqual(value.keys, ['description', 'command', 'timeoutMs'])
+  assert.deepEqual(value.template, { description: 'Execute a shell command and return stdout/stderr.', command: '' })
   assert.deepEqual(value.arg, { command: 'ls -la', description: 'List files' })
   console.log('templates: preloaded; only run_code_itself and run_code_templates')
 }
