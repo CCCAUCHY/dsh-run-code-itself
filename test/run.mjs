@@ -118,7 +118,6 @@ const webDefinition = { name: 'web_search', description: 'Search the web. Return
   assert.ok(guide.includes('args.description = run_code_itself.label'))
   assert.ok(guide.includes('## Hidden tools'))
   assert.ok(guide.includes('There are 1 other tool'))
-  assert.ok(guide.includes('do not print the whole list'))
   assert.ok(guide.includes('"code":"const args = run_code_subtools.bash.template'))
   assert.ok(guide.includes('"label":"List files"'))
   assert.ok(guide.includes('"command":"ls -la"'))

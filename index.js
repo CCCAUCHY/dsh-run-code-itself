@@ -158,7 +158,7 @@ export function renderProgramGuide(tools) {
     '',
     '## Hidden tools',
     '',
-    'All other tools are available in run_code_subtools. There are ' + hiddenLabel + '; do not print the whole list, inspect a named entry when needed.',
+    'All other tools are available in run_code_subtools. There are ' + hiddenLabel + '.',
   )
   return lines.join('\n')
 }
