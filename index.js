@@ -83,10 +83,8 @@ export function buildSubtools(definitions) {
     const required = Array.isArray(parameters.required) ? parameters.required : []
     const template = Object.create(null)
     for (const [key, property] of Object.entries(properties)) {
-      if (!isObjectRecord(property)) continue
-      if (required.includes(key)) template[key] = emptyValue(property)
-      else if (Object.prototype.hasOwnProperty.call(property, 'default')) template[key] = property.default
-      else template[key] = emptyValue(property)
+      if (!isObjectRecord(property) || required.includes(key)) continue
+      if (Object.prototype.hasOwnProperty.call(property, 'default')) template[key] = property.default
     }
     for (const key of required) {
       if (!Object.prototype.hasOwnProperty.call(template, key)) template[key] = ''
@@ -125,13 +123,13 @@ export function renderCompactSdk(tools) {
     '',
     'This runtime separates code from data. code is program logic; data and subtool arguments are sibling JSON fields of the run_code call, read inside the program as parsed values on run_code_itself.',
     '',
-    '1. **Subtool JSON MUST be a sibling field.** Put the argument object in a field named after the tool (bash, read, ...) and call tools.bash(run_code_itself.bash). Never write tools.x({...}) inline, regardless of payload size.',
+    '1. **Subtool arguments must be data, not an inline JSON literal.** Use a free-form sibling field (bash: {...}) and call tools.bash(run_code_itself.bash), or fill and pass run_code_subtools.<tool>.template directly. Never write tools.x({...}) with an inline object literal.',
     '2. **Minimize escaping inside code.** code is a JSON string; every quote, backslash, or newline inside it needs escaping. Move a value into a sibling field when that reduces escaping in code; keep it inline when inlining costs nothing extra.',
     '3. **Decide by actual escaping cost, not by type or size.** A short value may stay inline; a multiline string, JSON structure, or subtool arguments belong in a field. Rule 1 always applies to subtool JSON.',
     '',
     'Do not JSON.stringify or JSON.parse sibling values; do not declare run_code_itself.',
     '',
-    'run_code_subtools.<tool> holds a description and a template. The template contains every field: required fields are empty, optional fields use their schema default or an empty placeholder. Copy the template into the tool sibling field and fill the required values; print run_code_subtools.<tool> to see both.',
+    'run_code_subtools.<tool> is an object with description and template. The template contains every required field (empty) and optional fields that have a schema default. After filling the required fields it is directly usable as the tool argument object; do not pass run_code_subtools.<tool> itself. Print run_code_subtools.<tool> to see both.',
     '',
     '## SDK',
     '',
@@ -169,6 +167,10 @@ export function renderCompactSdk(tools) {
     '//   description: "List files",',
     '//   bash: { description: "List files", command: "ls -la" },',
     '// })',
+    '// Or use the template variable directly:',
+    '// const args = run_code_subtools.bash.template',
+    '// args.description = "List files"; args.command = "ls -la"',
+    '// return await tools.bash(args)',
     '',
     '## Other tools',
     '',

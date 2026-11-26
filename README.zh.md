@@ -34,7 +34,7 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 {"code":"return run_code_itself.rows.length","description":"数行数","rows":[{"id":"AB-123-4567"}]}
 ```
 
-目标是减少 `code` 字段内的转义开销，而不是按类型划分。如果内联一个值需要引号、反斜杠、换行、`JSON.stringify`/`JSON.parse` 或很长的字面量，就放进兄弟字段；简单值可以内联。子工具 JSON 始终放兄弟字段。
+目标是减少 `code` 字段内的转义开销，而不是按类型划分。如果内联一个值需要引号、反斜杠、换行、`JSON.stringify`/`JSON.parse` 或很长的字面量，就放进兄弟字段；简单值可以内联。子工具参数放自由兄弟字段或预加载模板变量，不能写成内联对象字面量。
 
 子工具的 JSON 也这样提前放好：
 
@@ -56,25 +56,31 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 }
 ```
 
-模板包含全部参数：必填为空，选填用 schema 默认值或空占位。打印其中一个：
+模板包含全部必填字段（空值），以及有 schema 默认值的选填字段；没有默认值的选填字段省略，所以填完必填字段后模板可以直接使用。打印其中一个：
 
 ```json
 {"code":"return run_code_subtools.bash","description":"查看 bash 元数据"}
 ```
 
-结果（截断）：
+结果：
 
 ```json
-{"description":"Execute a shell command and return stdout/stderr.","template":{"description":"","command":"","timeoutMs":0,"workdir":"","run_in_background":false,"sandbox_permissions":"","justification":""}}
+{"description":"Execute a shell command and return stdout/stderr.","template":{"description":"","command":""}}
 ```
 
-`run_code_subtools.bash` 只是预加载的参考。写进 `run_code` 调用的 `bash` 兄弟字段是自由 JSON，运行时解析成 `run_code_itself.bash`。复制模板、填需要的值；不需要的选填字段可以删掉，让工具使用运行时默认值：
+`run_code_subtools.bash` 是包装对象，不是参数。`run_code_subtools.bash.template` 才是参数对象；填完必填字段后可以直接传给 `tools.bash`：
+
+```json
+{"code":"const args = run_code_subtools.bash.template; args.description = '列文件'; args.command = 'ls -la'; return await tools.bash(args)","description":"列文件"}
+```
+
+`bash` 兄弟字段是 `run_code` 调用里的另一个自由字段，运行时解析成 `run_code_itself.bash`；这条路也有效：
 
 ```json
 {"code":"return await tools.bash(run_code_itself.bash)","description":"列文件","bash":{"description":"列文件","command":"ls -la"}}
 ```
 
-程序不会直接调用 `run_code_subtools.bash`。
+不要把 `run_code_subtools.bash` 本身传给 `tools.bash`；它里面是 `description` 和 `template`，不是命令参数。
 
 ## 按需工具文档
 
@@ -89,7 +95,7 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # 或 tgz：
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.4.0.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.4.1.tgz
 ```
 
 也可以在 **插件** 页面选择 **添加插件**，指向目录或 tgz。命令行只安装包；UI 的 **添加插件** 还会把 bundle 选进 profile（bundle 的补丁是空的，所以只影响插件页的显示）。

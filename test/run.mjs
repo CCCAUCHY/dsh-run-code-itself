@@ -275,7 +275,7 @@ console.log('')
   }
   const subtools = plugin.buildSubtools([bashDefinition])
   assert.equal(subtools.bash.description, 'Execute a shell command and return stdout/stderr.')
-  assert.deepEqual({ ...subtools.bash.template }, { description: '', command: '', timeoutMs: 0 })
+  assert.deepEqual({ ...subtools.bash.template }, { description: '', command: '' })
   const readDefinition = {
     name: 'read',
     description: 'Read a UTF-8 text file and return line-numbered content.',
@@ -286,7 +286,7 @@ console.log('')
     },
     output: { schema: {} },
   }
-  assert.deepEqual({ ...plugin.buildSubtools([readDefinition]).read.template }, { file_path: '', offset: 0 })
+  assert.deepEqual({ ...plugin.buildSubtools([readDefinition]).read.template }, { file_path: '' })
   const defaultDefinition = {
     name: 'demo',
     description: 'Demo tool.',
@@ -328,7 +328,7 @@ console.log('')
   const fn = new AsyncFunction(program)
   const value = await fn()
   assert.equal(value.description, 'Execute a shell command and return stdout/stderr.')
-  assert.deepEqual(value.template, { description: '', command: '', timeoutMs: 0 })
+  assert.deepEqual(value.template, { description: '', command: '' })
   assert.deepEqual(value.arg, { command: 'ls -la', description: 'List files' })
   console.log('subtools: description and full template preloaded; only run_code_itself and run_code_subtools')
 }

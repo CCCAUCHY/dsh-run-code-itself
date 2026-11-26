@@ -38,7 +38,7 @@ The model-facing `run_code` schema is open (`additionalProperties: true`). The h
 
 Inside `code`, the same payload needs a JavaScript literal and a second escaping layer for the `code` string. An extra field has only the outer JSON layer, and the program receives the parsed value directly.
 
-The goal is to minimize escaping inside `code`, not to classify values by type. If inlining a value needs quotes, backslashes, newlines, `JSON.stringify`/`JSON.parse`, or a large literal, put it in a sibling field; simple values can stay inline. Subtool JSON always goes in a sibling field.
+The goal is to minimize escaping inside `code`, not to classify values by type. If inlining a value needs quotes, backslashes, newlines, `JSON.stringify`/`JSON.parse`, or a large literal, put it in a sibling field; simple values can stay inline. Subtool arguments go in a free-form sibling field or the preloaded template variable, never in an inline object literal.
 
 Prepare nested tool arguments the same way:
 
@@ -60,25 +60,31 @@ Every visible tool has one entry in `run_code_subtools`:
 }
 ```
 
-The template contains every parameter: required fields are empty, optional fields use their schema default or an empty placeholder. Print one:
+The template contains every required field (empty) plus optional fields that have a schema default. Optional fields without a default are omitted, so the template is directly usable after filling the required values. Print one:
 
 ```json
 {"code":"return run_code_subtools.bash","description":"Read the bash metadata"}
 ```
 
-Result (abbreviated):
+Result:
 
 ```json
-{"description":"Execute a shell command and return stdout/stderr.","template":{"description":"","command":"","timeoutMs":0,"workdir":"","run_in_background":false,"sandbox_permissions":"","justification":""}}
+{"description":"Execute a shell command and return stdout/stderr.","template":{"description":"","command":""}}
 ```
 
-`run_code_subtools.bash` is only the preloaded reference. The `bash` sibling field is a free-form field you write into the `run_code` call; at runtime it is `run_code_itself.bash`. Copy the template, fill the values you need, and omit optional fields when they should use the tool's runtime default:
+`run_code_subtools.bash` is the wrapper, not the arguments. `run_code_subtools.bash.template` is the argument object; after filling the required fields it can be passed directly to `tools.bash`:
+
+```json
+{"code":"const args = run_code_subtools.bash.template; args.description = 'List files'; args.command = 'ls -la'; return await tools.bash(args)","description":"List files"}
+```
+
+The `bash` sibling field is a separate free-form field you write into the `run_code` call; at runtime it is `run_code_itself.bash`. That path is also valid:
 
 ```json
 {"code":"return await tools.bash(run_code_itself.bash)","description":"List files","bash":{"description":"List files","command":"ls -la"}}
 ```
 
-The program never calls `run_code_subtools.bash` directly.
+Do not pass `run_code_subtools.bash` itself to `tools.bash`; it contains `description` and `template`, not command arguments.
 
 ## On-demand tool documentation
 
@@ -98,7 +104,7 @@ The system prompt renders a compact SDK with full TypeScript declarations for th
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # or a packed tarball:
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.4.0.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.4.1.tgz
 ```
 
 Or use **Plugins → Add plugin** in the DSH Web UI and point it at the directory or tarball. The CLI only installs the package; the Web UI also selects the bundle (its patch is empty, so this only affects the Plugins listing).
