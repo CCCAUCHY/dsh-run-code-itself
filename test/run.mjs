@@ -115,6 +115,7 @@ const webDefinition = { name: 'web_search', description: 'Search the web. Return
   assert.ok(guide.includes('## Program variables'))
   assert.ok(guide.includes('## Common tools'))
   assert.ok(guide.includes('bash(description, command'))
+  assert.ok(guide.includes('args.description = run_code_itself.label'))
   assert.ok(guide.includes('## Hidden tools'))
   assert.ok(!guide.includes('web_search: Search the web.'))
   assert.ok(!guide.includes('declare const tools'))
