@@ -44,7 +44,7 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 
 ## 工具模板
 
-所有可见工具的模板都预加载在 `run_code_templates` 里，是最小参数对象：包含全部必填字段，值为空占位；如果工具有 `description` 参数，则填入完整工具描述。打印其中一个：
+所有可见工具的模板都预加载在 `run_code_templates` 里，是最小参数对象：包含全部必填字段，值全部为空。打印其中一个：
 
 ```json
 {"code":"return run_code_templates.bash","description":"查看 bash 模板"}
@@ -53,20 +53,20 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 结果：
 
 ```json
-{"description":"Execute a shell command and return stdout/stderr.","command":""}
+{"description":"","command":""}
 ```
 
-下面的示例就是同一个对象，只把 `command` 从空值填成 `ls -la`，键名完全一致：
+下面的示例把这个模板复制进 `bash` 兄弟字段，并填入两个值：
 
 ```json
-{"code":"return await tools.bash(run_code_itself.bash)","description":"列文件","bash":{"description":"Execute a shell command and return stdout/stderr.","command":"ls -la"}}
+{"code":"return await tools.bash(run_code_itself.bash)","description":"列文件","bash":{"description":"列文件","command":"ls -la"}}
 ```
 
-`run_code_templates` 是和 `run_code_itself` 并列的预加载变量。
+`run_code_templates.bash` 只是预加载的参考模板。写进调用的 `bash` 兄弟字段在运行时解析成 `run_code_itself.bash`，程序不会直接调用 `run_code_templates.bash`。
 
 ## 按需工具文档
 
-系统提示词里渲染一份紧凑 SDK：常用工具（`bash`、`read`、`write`、`edit`、`glob`、`grep`）有完整 TypeScript 声明，其余可见工具列在描述索引里。没有 `description` 参数的工具，索引里放完整描述；有 `description` 参数的工具，完整描述在模板里，索引只放一句话摘要。所有工具仍然可调用；对未展开的工具，先打印最小模板拿到必填字段，再用 `tools.name` 和嵌套兄弟字段调用。
+系统提示词里渲染一份紧凑 SDK：常用工具（`bash`、`read`、`write`、`edit`、`glob`、`grep`）有完整 TypeScript 声明，其余可见工具列在带完整描述的索引里。所有工具仍然可调用；对未展开的工具，先打印最小模板拿到必填字段，再用 `tools.name` 和嵌套兄弟字段调用。
 
 ## 元编程
 
@@ -77,7 +77,7 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # 或 tgz：
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.3.2.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.3.3.tgz
 ```
 
 也可以在 **插件** 页面选择 **添加插件**，指向目录或 tgz。命令行只安装包；UI 的 **添加插件** 还会把 bundle 选进 profile（bundle 的补丁是空的，所以只影响插件页的显示）。

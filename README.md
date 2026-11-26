@@ -48,7 +48,7 @@ Prepare nested tool arguments the same way:
 
 ## Tool templates
 
-Every visible tool's template is preloaded in `run_code_templates` as a minimal argument object: all required fields, empty placeholders, and the full tool description in the `description` property when the tool has one. Print one:
+Every visible tool's template is preloaded in `run_code_templates` as a minimal argument object: all required fields with empty values. Print one:
 
 ```json
 {"code":"return run_code_templates.bash","description":"Read the bash template"}
@@ -57,20 +57,20 @@ Every visible tool's template is preloaded in `run_code_templates` as a minimal 
 Result:
 
 ```json
-{"description":"Execute a shell command and return stdout/stderr.","command":""}
+{"description":"","command":""}
 ```
 
-The example below is exactly this object with `command` filled to `ls -la`; the keys are identical:
+The example below copies this template into the `bash` sibling field and fills both values:
 
 ```json
-{"code":"return await tools.bash(run_code_itself.bash)","description":"List files","bash":{"description":"Execute a shell command and return stdout/stderr.","command":"ls -la"}}
+{"code":"return await tools.bash(run_code_itself.bash)","description":"List files","bash":{"description":"List files","command":"ls -la"}}
 ```
 
-`run_code_templates` is a preloaded variable alongside `run_code_itself`.
+`run_code_templates.bash` is only the preloaded reference. The `bash` sibling field you write is parsed into `run_code_itself.bash` at runtime; the program never calls `run_code_templates.bash` directly.
 
 ## On-demand tool documentation
 
-The system prompt renders a compact SDK with full TypeScript declarations for the common tools (`bash`, `read`, `write`, `edit`, `glob`, `grep`) and a description index for all other visible tools. Tools without a `description` argument show their full description in that index; tools that have one carry the full description in their template and the index shows a one-line summary. Every tool remains callable; for a hidden tool, print its minimal template first to get the required fields, then call it with `tools.name` and a nested sibling field.
+The system prompt renders a compact SDK with full TypeScript declarations for the common tools (`bash`, `read`, `write`, `edit`, `glob`, `grep`) and a full-description index for all other visible tools. Every tool remains callable; for a hidden tool, print its minimal template first to get the required fields, then call it with `tools.name` and a nested sibling field.
 
 ## Metaprogramming
 
@@ -86,7 +86,7 @@ The system prompt renders a compact SDK with full TypeScript declarations for th
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # or a packed tarball:
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.3.2.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.3.3.tgz
 ```
 
 Or use **Plugins → Add plugin** in the DSH Web UI and point it at the directory or tarball. The CLI only installs the package; the Web UI also selects the bundle (its patch is empty, so this only affects the Plugins listing).

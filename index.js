@@ -84,10 +84,7 @@ export function buildTemplates(definitions) {
     const properties = isObjectRecord(parameters.properties) ? parameters.properties : {}
     const required = Array.isArray(parameters.required) ? parameters.required : []
     const template = Object.create(null)
-    const hasDescription = Object.prototype.hasOwnProperty.call(properties, 'description')
-    if (hasDescription) template.description = definition.description === undefined ? '' : String(definition.description)
     for (const key of required) {
-      if (key === 'description' && hasDescription) continue
       const property = properties[key]
       template[key] = isObjectRecord(property) ? emptyValue(property) : ''
     }
@@ -128,7 +125,7 @@ export function renderCompactSdk(tools) {
     '',
     'Do not JSON.stringify or JSON.parse sibling values; do not declare run_code_itself.',
     '',
-    'All tool templates are preloaded in run_code_templates as minimal argument objects: every required field is present, values are empty, and the description property (when the tool has one) contains the full tool description. Fill the values and pass the object as the tool sibling field; print run_code_templates.<tool> to see it.',
+    'All tool templates are preloaded in run_code_templates as minimal argument objects: every required field is present with an empty value. Fill the values and pass the object as the tool sibling field; print run_code_templates.<tool> to see it.',
     '',
     '## SDK',
     '',
@@ -159,11 +156,12 @@ export function renderCompactSdk(tools) {
     'declare const tools: { [K in keyof ToolArgsMap]: (args: ToolArgsMap[K]) => Promise<ToolOutputMap[K]> }',
     '',
     '// Code-Data Separation example:',
-    '// The bash object is run_code_templates.bash with command filled:',
+    '// The bash sibling field is run_code_templates.bash with values filled;',
+    '// at runtime it is read as run_code_itself.bash:',
     '// run_code({',
     '//   code: "return await tools.bash(run_code_itself.bash)",',
     '//   description: "List files",',
-    '//   bash: { description: "Execute a shell command and return stdout/stderr.", command: "ls -la" },',
+    '//   bash: { description: "List files", command: "ls -la" },',
     '// })',
     '',
     '## Other tools',
@@ -171,12 +169,7 @@ export function renderCompactSdk(tools) {
     'These tools are callable but not declared in the compact SDK. Print their template for the required argument fields:',
     '',
   )
-  for (const tool of other) {
-    const hasDescriptionParam = isObjectRecord(tool.parameters)
-      && isObjectRecord(tool.parameters.properties)
-      && Object.prototype.hasOwnProperty.call(tool.parameters.properties, 'description')
-    lines.push('- ' + tool.name + ': ' + (hasDescriptionParam ? firstSentence(tool.description) : docText(tool.description)))
-  }
+  for (const tool of other) lines.push('- ' + tool.name + ': ' + docText(tool.description))
   return lines.join('\n')
 }
 

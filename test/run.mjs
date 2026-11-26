@@ -274,10 +274,7 @@ console.log('')
     },
   }
   const templates = plugin.buildTemplates([bashDefinition])
-  assert.deepEqual({ ...templates.bash }, {
-    description: 'Execute a shell command and return stdout/stderr.',
-    command: '',
-  })
+  assert.deepEqual({ ...templates.bash }, { description: '', command: '' })
   const readDefinition = {
     name: 'read',
     description: 'Read a UTF-8 text file and return line-numbered content.',
@@ -318,7 +315,7 @@ console.log('')
   assert.ok(!program.includes('run_code_call'))
   const fn = new AsyncFunction(program)
   const value = await fn()
-  assert.deepEqual(value.template, { description: 'Execute a shell command and return stdout/stderr.', command: '' })
+  assert.deepEqual(value.template, { description: '', command: '' })
   assert.deepEqual(value.arg, { command: 'ls -la', description: 'List files' })
   console.log('templates: preloaded; only run_code_itself and run_code_templates')
 }
