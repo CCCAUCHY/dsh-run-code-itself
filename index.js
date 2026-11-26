@@ -25,8 +25,8 @@ export const Config = z.object({
   promptMode: z.union(['system', 'tool']).default('system').description(
     'Where to put the Code-Data Separation guide: the system prompt SDK section or the run_code tool description.',
   ),
-  sdkStyle: z.union(['declarations', 'index']).default('declarations').description(
-    'System-prompt SDK style: TypeScript declarations or a compact tool index without PTC-like declarations.',
+  sdkStyle: z.union(['declarations', 'index', 'rules']).default('declarations').description(
+    'System-prompt style: TypeScript declarations, a compact tool index, or a rules-heavy guide with only common tools listed.',
   ),
 })
 
@@ -162,6 +162,27 @@ export function renderCompactSdk(tools, options = {}) {
     '// })',
     '',
   ]
+  if (sdkStyle === 'rules') {
+    const common = tools.filter(tool => COMMON_TOOLS.has(tool.name))
+    const lines = [
+      renderUsageRules(),
+      '',
+      '## Common tools',
+      '',
+      'These are the commonly used tools. Other tools are not listed here.',
+      '',
+    ]
+    for (const tool of common) {
+      lines.push('- ' + signatureFor(tool) + ': ' + docText(tool.description))
+    }
+    lines.push(
+      '',
+      '## Hidden tools',
+      '',
+      'Every other tool is available. run_code_subtools is the complete JSON object; write code to inspect it with Object.keys(run_code_subtools), or print a named entry to read its description and template. No search API is needed.',
+    )
+    return lines.join('\n')
+  }
   if (sdkStyle === 'index') {
     lines.push('## Tools', '', 'All tools are callable as await tools.name(args). run_code_subtools.<tool> has the full description and template.', '')
     for (const tool of tools) {
@@ -312,7 +333,6 @@ export class RunCodeItselfExecutor extends PtcExecutor {
       this.sections = []
     } else if (sections.length > 1) {
       this.sections = [
-        sections[0],
         {
           name: sections[1].name,
           order: sections[1].order,

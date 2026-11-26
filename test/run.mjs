@@ -402,7 +402,18 @@ console.log('')
   assert.ok(toolSchema.description.includes('edit(file_path, old_string, new_string, replace_all?) -> {path, before, after}'))
   assert.ok(!toolSchema.description.includes('declare const tools'))
   assert.equal(toolExecutor.sections.length, 0)
-  console.log('prompt modes: index SDK and tool-description mode')
+
+  const rulesSdk = plugin.renderCompactSdk([bashDefinition, webDefinition], { sdkStyle: 'rules' })
+  assert.ok(rulesSdk.includes('## run_code Usage Rules'))
+  assert.ok(rulesSdk.includes('## Common tools'))
+  assert.ok(rulesSdk.includes('bash('))
+  assert.ok(!rulesSdk.includes('web_search'))
+  assert.ok(rulesSdk.includes('run_code_subtools is the complete JSON object'))
+  assert.ok(!rulesSdk.includes('declare const tools'))
+  const systemExecutor = new plugin.RunCodeItselfExecutor(toolCtx, { promptMode: 'system', sdkStyle: 'rules' })
+  const systemSchema = systemExecutor.describe([bashDefinition, webDefinition]).schemas[0]
+  assert.ok(rulesSdk.length > systemSchema.description.length)
+  console.log('prompt modes: index SDK, tool-description mode, and rules-heavy system mode')
 
   console.log('subtools: description and full template preloaded; only run_code_itself and run_code_subtools')
 }

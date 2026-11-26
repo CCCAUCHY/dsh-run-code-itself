@@ -106,7 +106,7 @@ The system prompt renders a compact SDK with full TypeScript declarations for th
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # or a packed tarball:
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.4.8.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.4.9.tgz
 ```
 
 Or use **Plugins → Add plugin** in the DSH Web UI and point it at the directory or tarball. The CLI only installs the package; the Web UI also selects the bundle (its patch is empty, so this only affects the Plugins listing).
@@ -166,7 +166,7 @@ If a future DSH version changes the internal `requirePtcTransport` hook, the plu
 | `maxSubCallsPerMinute` | inherited from the replaced PTC executor | Nested tool-call attempts per minute of `run_code` timeout |
 | `maxParallelSubCalls` | inherited from the replaced PTC executor | Maximum overlapping concurrency-safe program subcalls |
 | `promptMode` | `system` | `system` keeps the Code-Data guide in the SDK section; `tool` appends it to the `run_code` tool description |
-| `sdkStyle` | `declarations` | `declarations` renders the TypeScript SDK; `index` renders a compact tool index without PTC-style declarations |
+| `sdkStyle` | `declarations` | `declarations` renders the TypeScript SDK; `index` renders a compact tool index; `rules` lists only common tools and leaves hidden tools to `run_code_subtools` |
 
 ### Minimal mode
 
@@ -208,6 +208,35 @@ Result:
 `promptMode: tool` drops both `tools:ptc-only` and `tools:sdk`. The tools array already sends only `run_code`, so the PTC-only instruction is redundant. The base `run_code` description is adjusted to point at the tool list in that same description.
 
 This is a supported minimal configuration, not the default; use a preset copy for A/B comparison. If the model still inlines, the PTC SDK shape is not the whole cause.
+
+### System-rules mode (last prompt attempt)
+
+This mode keeps the rules in the system prompt and makes the tool description short.
+
+`persona.complete` **must be false** here: `complete: true` suppresses the `tools:sdk` section, and the rules would disappear. AGENTS.md, skills, runtime context, and time remain user reminders.
+
+```yaml
+- id: persona
+  name: '@deepseek-ai/dsh-persona'
+  config:
+    prefix: You are a helpful software engineer assistant.
+    complete: false
+    includeRuntimeContext: false
+
+- id: run-code-itself
+  name: 'dsh-run-code-itself'
+  config:
+    promptMode: system
+    sdkStyle: rules
+```
+
+The system section contains:
+
+- `## run_code Usage Rules`;
+- `## Common tools` with only `bash`, `read`, `write`, `edit`, `glob`, `grep` and their compact signatures;
+- a `## Hidden tools` note saying that `run_code_subtools` is the complete JSON object and can be inspected with code.
+
+Other tools are not listed. The tool description stays short, while the rules and common-tool section are deliberately longer than it.
 
 ## Limitations
 

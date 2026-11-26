@@ -97,7 +97,7 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # 或 tgz：
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.4.8.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.4.9.tgz
 ```
 
 也可以在 **插件** 页面选择 **添加插件**，指向目录或 tgz。命令行只安装包；UI 的 **添加插件** 还会把 bundle 选进 profile（bundle 的补丁是空的，所以只影响插件页的显示）。
@@ -136,7 +136,7 @@ bundle 自带的 `cordis.patch.yml` 是**空的**：安装只会把包装进 pro
 | `maxSubCallsPerMinute` | 继承被替换的 PTC 执行器 | 程序内每分钟允许的嵌套工具调用次数 |
 | `maxParallelSubCalls` | 继承被替换的 PTC 执行器 | 并发安全的嵌套调用上限 |
 | `promptMode` | `system` | `system` 把 Code-Data 指南放在 SDK 段；`tool` 把它追加到 `run_code` 工具描述 |
-| `sdkStyle` | `declarations` | `declarations` 渲染 TypeScript SDK；`index` 渲染紧凑工具索引，不含 PTC 风格声明 |
+| `sdkStyle` | `declarations` | `declarations` 渲染 TypeScript SDK；`index` 渲染紧凑工具索引；`rules` 只列常用工具，其余隐藏在 `run_code_subtools` |
 
 ### 极简模式
 
@@ -178,6 +178,35 @@ bundle 自带的 `cordis.patch.yml` 是**空的**：安装只会把包装进 pro
 `promptMode: tool` 会同时去掉 `tools:ptc-only` 和 `tools:sdk`。工具数组本来就只发 `run_code`，PTC-only 说明是冗余的。基础 `run_code` 描述会被改成指向同一份描述里的工具列表。
 
 这是受支持的极简配置，不是默认值；用预设副本做 A/B 对比。如果模型仍然内联，说明 PTC SDK 形状不是全部原因。
+
+### 系统规范模式（最后一次提示词尝试）
+
+这个模式把规范放回系统提示词，并让工具描述保持简短。
+
+这里 `persona.complete` **必须是 false**：`complete: true` 会抑制 `tools:sdk` 段，规范会消失。AGENTS.md、技能、runtime context、时间仍然是用户消息。
+
+```yaml
+- id: persona
+  name: '@deepseek-ai/dsh-persona'
+  config:
+    prefix: You are a helpful software engineer assistant.
+    complete: false
+    includeRuntimeContext: false
+
+- id: run-code-itself
+  name: 'dsh-run-code-itself'
+  config:
+    promptMode: system
+    sdkStyle: rules
+```
+
+系统段包含：
+
+- `## run_code Usage Rules`；
+- `## Common tools`，只列 `bash`、`read`、`write`、`edit`、`glob`、`grep` 和紧凑签名；
+- `## Hidden tools`，说明 `run_code_subtools` 是完整 JSON，可以用代码枚举和查看。
+
+其他工具不列出。工具描述保持简短，规范段和常用工具段故意比工具描述更长。
 
 ## 实现与限制
 
