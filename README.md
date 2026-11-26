@@ -106,7 +106,7 @@ The system prompt renders a compact SDK with full TypeScript declarations for th
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # or a packed tarball:
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.4.6.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.4.7.tgz
 ```
 
 Or use **Plugins → Add plugin** in the DSH Web UI and point it at the directory or tarball. The CLI only installs the package; the Web UI also selects the bundle (its patch is empty, so this only affects the Plugins listing).
@@ -179,8 +179,9 @@ If a future DSH version changes the internal `requirePtcTransport` hook, the plu
   name: '@deepseek-ai/dsh-persona'
   config:
     prefix: |
-      You are a helpful assistant.
-      You must follow the run_code usage rules in the run_code tool description.
+      You are a helpful software engineer assistant.
+      You MUST follow the run_code usage rules in the run_code tool description.
+      Never inline subtool arguments: use run_code_itself sibling fields or run_code_subtools templates, and return only JSON-safe values.
     complete: true
     includeRuntimeContext: false
 ```

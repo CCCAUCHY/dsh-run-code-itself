@@ -300,6 +300,51 @@ console.log('')
   assert.deepEqual({ ...plugin.buildSubtools([defaultDefinition]).demo.template }, { required: '', optional: 7 })
 
   const webDefinition = { name: 'web_search', description: 'Search the web. Returns results.', parameters: {}, output: { schema: {} } }
+  const writeDefinition = {
+    name: 'write',
+    description: 'Create or fully replace a UTF-8 text file.',
+    parameters: {
+      type: 'object',
+      properties: {
+        file_path: { type: 'string' },
+        content: { type: 'string' },
+        sandbox_permissions: { type: 'string' },
+        justification: { type: 'string' },
+      },
+      required: ['file_path', 'content'],
+    },
+    output: {
+      schema: {
+        type: 'object',
+        properties: {
+          path: { type: 'string' },
+          operation: { type: 'string' },
+          before: { type: 'string' },
+          after: { type: 'string' },
+        },
+      },
+    },
+  }
+  const editDefinition = {
+    name: 'edit',
+    description: 'Edit an existing UTF-8 text file by replacing literal text.',
+    parameters: {
+      type: 'object',
+      properties: {
+        file_path: { type: 'string' },
+        old_string: { type: 'string' },
+        new_string: { type: 'string' },
+        replace_all: { type: 'boolean' },
+      },
+      required: ['file_path', 'old_string', 'new_string'],
+    },
+    output: {
+      schema: {
+        type: 'object',
+        properties: { path: { type: 'string' }, before: { type: 'string' }, after: { type: 'string' } },
+      },
+    },
+  }
   const sdk = plugin.renderCompactSdk([bashDefinition, webDefinition])
   assert.ok(sdk.includes('## Code-Data Separation'))
   assert.ok(sdk.includes('**Minimize escaping in code.**'))
@@ -344,7 +389,7 @@ console.log('')
 
   const { ctx: toolCtx } = harness()
   const toolExecutor = new plugin.RunCodeItselfExecutor(toolCtx, { promptMode: 'tool' })
-  const toolSchema = toolExecutor.describe([bashDefinition, webDefinition]).schemas[0]
+  const toolSchema = toolExecutor.describe([bashDefinition, webDefinition, writeDefinition, editDefinition]).schemas[0]
   const toolsIndex = toolSchema.description.indexOf('## Tools')
   const rulesIndex = toolSchema.description.indexOf('## run_code Usage Rules')
   assert.ok(toolSchema.description.startsWith('Execute a TypeScript program'))
@@ -352,6 +397,8 @@ console.log('')
   assert.ok(rulesIndex > toolsIndex)
   assert.ok(toolSchema.description.includes('Code-Data Separation'))
   assert.ok(toolSchema.description.includes('Search the web. Returns results.'))
+  assert.ok(toolSchema.description.includes('write(file_path, content, sandbox_permissions?, justification?) -> {path, operation, before, after}'))
+  assert.ok(toolSchema.description.includes('edit(file_path, old_string, new_string, replace_all?) -> {path, before, after}'))
   assert.ok(!toolSchema.description.includes('declare const tools'))
   assert.equal(toolExecutor.sections.length, 0)
   console.log('prompt modes: index SDK and tool-description mode')

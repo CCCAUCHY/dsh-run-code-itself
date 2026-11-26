@@ -217,6 +217,18 @@ export function renderCompactSdk(tools, options = {}) {
 }
 
 
+/** Compact argument and return names for one tool. */
+function signatureFor(definition) {
+  const parameters = isObjectRecord(definition.parameters) ? definition.parameters : {}
+  const properties = isObjectRecord(parameters.properties) ? parameters.properties : {}
+  const required = new Set(Array.isArray(parameters.required) ? parameters.required : [])
+  const args = Object.keys(properties).map(key => required.has(key) ? key : key + '?').join(', ')
+  const output = definition.output !== undefined && isObjectRecord(definition.output.schema) ? definition.output.schema : {}
+  const outputProperties = isObjectRecord(output.properties) ? Object.keys(output.properties) : []
+  const returns = outputProperties.length > 0 ? '{' + outputProperties.join(', ') + '}' : 'JsonValue'
+  return definition.name + '(' + args + ') -> ' + returns
+}
+
 /** Tool list for the run_code description, without usage rules. */
 export function renderToolList(tools, options = {}) {
   const lines = [
@@ -226,7 +238,7 @@ export function renderToolList(tools, options = {}) {
     '',
   ]
   for (const tool of tools) {
-    lines.push('- ' + tool.name + ': ' + (options.fullDescriptions ? docText(tool.description) : firstSentence(tool.description)))
+    lines.push('- ' + signatureFor(tool) + ': ' + (options.fullDescriptions ? docText(tool.description) : firstSentence(tool.description)))
   }
   return lines.join('\n')
 }
