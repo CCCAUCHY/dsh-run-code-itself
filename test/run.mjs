@@ -349,7 +349,7 @@ console.log('')
   assert.ok(toolSchema.description.includes('## Tools'))
   assert.ok(toolSchema.description.includes('Search the web. Returns results.'))
   assert.ok(!toolSchema.description.includes('declare const tools'))
-  assert.equal(toolExecutor.sections.length, 1)
+  assert.equal(toolExecutor.sections.length, 0)
   console.log('prompt modes: index SDK and tool-description mode')
 
   console.log('subtools: description and full template preloaded; only run_code_itself and run_code_subtools')

@@ -97,7 +97,7 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # 或 tgz：
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.4.4.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.4.5.tgz
 ```
 
 也可以在 **插件** 页面选择 **添加插件**，指向目录或 tgz。命令行只安装包；UI 的 **添加插件** 还会把 bundle 选进 profile（bundle 的补丁是空的，所以只影响插件页的显示）。
@@ -138,24 +138,22 @@ bundle 自带的 `cordis.patch.yml` 是**空的**：安装只会把包装进 pro
 | `promptMode` | `system` | `system` 把 Code-Data 指南放在 SDK 段；`tool` 把它追加到 `run_code` 工具描述 |
 | `sdkStyle` | `declarations` | `declarations` 渲染 TypeScript SDK；`index` 渲染紧凑工具索引，不含 PTC 风格声明 |
 
-### 提示词位置实验
+### 极简模式
 
-系统提示词里的 SDK 本质上是一段 PTC 声明，可能诱导模型直接写 `tools.x({...})`。隔离这个因素时，在**预设副本**里测试：
+`persona.complete: true` 只把**系统提示词**替换为 persona 前缀，不会屏蔽单独的 user system-reminder：AGENTS.md、技能目录、runtime context、时间仍然作为用户消息注入。
 
-1. persona 改成最小 complete 提示词：
+1. 极简 persona：
 
 ```yaml
 - id: persona
   name: '@deepseek-ai/dsh-persona'
   config:
-    prefix: |
-      You are a helpful assistant. Use run_code for every action.
-      Follow the Code-Data Separation rules and tool list in the run_code tool description.
+    prefix: You are a helpful assistant.
     complete: true
     includeRuntimeContext: false
 ```
 
-2. 把指南移进工具描述，并去掉 SDK 声明：
+2. 把指南和全部工具描述移进 `run_code` 工具描述：
 
 ```yaml
 - id: run-code-itself
@@ -165,9 +163,18 @@ bundle 自带的 `cordis.patch.yml` 是**空的**：安装只会把包装进 pro
     sdkStyle: index
 ```
 
-3. 新建会话，试“随便调用一下”。
+3. 新建会话。
 
-`complete: true` 会屏蔽**所有其他系统提示词段**，包括 AGENTS.md、技能、运行时上下文和 PTC-only 说明。这是实验配置，不建议直接用于生产。如果仍然失败，说明 PTC SDK 不是全部原因；如果成功，再回退到只开 `sdkStyle: index`，最后再恢复 `promptMode: system`。
+结果：
+
+- system message：只有 persona 前缀；
+- 用户消息里的 AGENTS.md、技能、runtime context、时间保持不变；
+- tools 数组：只有 `run_code`，其 description 包含 Code-Data Separation 和全部工具描述；
+- 没有系统 SDK 段，也没有 PTC-only 段。
+
+`promptMode: tool` 会同时去掉 `tools:ptc-only` 和 `tools:sdk`。工具数组本来就只发 `run_code`，PTC-only 说明是冗余的。基础 `run_code` 描述会被改成指向同一份描述里的工具列表。
+
+这是受支持的极简配置，不是默认值；用预设副本做 A/B 对比。如果模型仍然内联，说明 PTC SDK 形状不是全部原因。
 
 ## 实现与限制
 

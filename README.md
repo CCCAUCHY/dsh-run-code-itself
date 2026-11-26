@@ -106,7 +106,7 @@ The system prompt renders a compact SDK with full TypeScript declarations for th
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # or a packed tarball:
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.4.4.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.4.5.tgz
 ```
 
 Or use **Plugins → Add plugin** in the DSH Web UI and point it at the directory or tarball. The CLI only installs the package; the Web UI also selects the bundle (its patch is empty, so this only affects the Plugins listing).
@@ -168,24 +168,22 @@ If a future DSH version changes the internal `requirePtcTransport` hook, the plu
 | `promptMode` | `system` | `system` keeps the Code-Data guide in the SDK section; `tool` appends it to the `run_code` tool description |
 | `sdkStyle` | `declarations` | `declarations` renders the TypeScript SDK; `index` renders a compact tool index without PTC-style declarations |
 
-### Prompt placement experiment
+### Minimal mode
 
-The system SDK is literally a PTC declaration block, which can prime a model to write `tools.x({...})` inline. To isolate that influence, test in a **copy** of the preset:
+`persona.complete: true` replaces the **system prompt** with the persona prefix. It does **not** suppress the separate user system-reminders: AGENTS.md, the skill catalog, runtime context, and time context are still injected as user messages.
 
-1. Set the persona to a minimal complete prompt:
+1. Minimal persona:
 
 ```yaml
 - id: persona
   name: '@deepseek-ai/dsh-persona'
   config:
-    prefix: |
-      You are a helpful assistant. Use run_code for every action.
-      Follow the Code-Data Separation rules and tool list in the run_code tool description.
+    prefix: You are a helpful assistant.
     complete: true
     includeRuntimeContext: false
 ```
 
-2. Move the guide into the tool description and drop the SDK declarations:
+2. Move the guide and full tool descriptions into the `run_code` tool description:
 
 ```yaml
 - id: run-code-itself
@@ -195,9 +193,18 @@ The system SDK is literally a PTC declaration block, which can prime a model to 
     sdkStyle: index
 ```
 
-3. Start a new session and try “随便调用一下”.
+3. Start a new session.
 
-`complete: true` suppresses **every other system section**, including AGENTS.md, skills, runtime context, and the PTC-only instruction. This is an experiment, not a recommended production configuration. If it fails, the PTC SDK is not the whole story; if it works, step back to `sdkStyle: index` alone, then to normal `promptMode: system`.
+Result:
+
+- system message: the persona prefix only;
+- user reminders: AGENTS.md, skills, runtime context, and time unchanged;
+- tools array: only `run_code`, whose description contains Code-Data Separation and all tool descriptions;
+- no system SDK section and no PTC-only section.
+
+`promptMode: tool` drops both `tools:ptc-only` and `tools:sdk`. The tools array already sends only `run_code`, so the PTC-only instruction is redundant. The base `run_code` description is adjusted to point at the tool list in that same description.
+
+This is a supported minimal configuration, not the default; use a preset copy for A/B comparison. If the model still inlines, the PTC SDK shape is not the whole cause.
 
 ## Limitations
 

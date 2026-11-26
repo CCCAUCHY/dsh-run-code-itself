@@ -236,7 +236,7 @@ export class RunCodeItselfExecutor extends PtcExecutor {
     this.sdkStyle = sdkStyle
     const sections = this.sections
     if (promptMode === 'tool') {
-      this.sections = [sections[0]]
+      this.sections = []
     } else if (sections.length > 1) {
       this.sections = [
         sections[0],
