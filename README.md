@@ -24,6 +24,10 @@ or use the template as a complete call:
 
     {"code":"const args = run_code_subtools.bash.template; args.description = run_code_itself.label; args.command = run_code_itself.command; return await tools.bash(args)","description":"List files","label":"List files","command":"ls -la"}
 
+Array and loop:
+
+    {"code":"const out = []; for (const e of run_code_itself.edits) out.push(await tools.edit(e)); return out.map(r => r.path)","description":"Apply edits","edits":[{"file_path":"a.ts","old_string":"old","new_string":"new"},{"file_path":"b.ts","old_string":"old2","new_string":"new2"}]}
+
 run_code_subtools is a plain JSON object. All visible tools are there, including tools not listed in the prompt; inspect it with Object.keys(run_code_subtools) or print a named entry.
 
 Templates are structural skeletons: required fields are present with simple empty placeholders, and optional fields with schema defaults are included. Complex enum, union, or nested required values are not guessed; fill them in code and rely on the tool schema for validation.
@@ -33,7 +37,7 @@ Templates are structural skeletons: required fields are present with simple empt
 The system prompt contains:
 
 - Data-Code Separation rules;
-- compact signatures for common tools: bash, read, write, edit, glob, grep;
+- compact signatures for common tools: bash, read, write, edit, glob, grep, read_image;
 - a hidden-tools note.
 
 The run_code tool description is deliberately short and contains the essential contract, so a suppressed system guide does not remove every rule. The guide is longer than the tool description.
@@ -69,7 +73,7 @@ A previous experimental version exposed the tool as program. Three independent r
 
 ## Behaviour and limits
 
-- Only TypeScript PTC is supported. Python PTC is rejected with a clear error.
+- Targets the TypeScript PTC runtime. The plugin does not import or switch to a Python PTC runtime.
 - The plugin does not hard-enforce Code-Data Separation. General TypeScript can still construct argument objects in code; prompt compliance is model-dependent.
 - A small cross-model check showed OpenAI and Google models following the guide; a DeepSeek-flash route reverted to inline calls on complex tasks.
 - If deterministic enforcement is required, use runtime provenance or a no-code pipeline; neither is implemented here.

@@ -113,15 +113,17 @@ const webDefinition = { name: 'web_search', description: 'Search the web. Return
   const guide = plugin.renderProgramGuide([bashDefinition, readDefinition, webDefinition])
   assert.ok(guide.includes('## Data-Code Separation'))
   assert.ok(guide.includes('## Program variables'))
-  assert.ok(guide.includes('## Common tools'))
+  assert.ok(guide.includes('Common tools:'))
   assert.ok(guide.includes('bash(description, command'))
   assert.ok(guide.includes('args.description = run_code_itself.label'))
-  assert.ok(guide.includes('## Hidden tools'))
-  assert.ok(guide.includes('There are 1 other tool'))
+  assert.ok(guide.includes('Other tools:'))
+  assert.ok(guide.includes('web_search()'))
+  assert.ok(guide.includes('Search the web.'))
   assert.ok(guide.includes('"code":"const args = run_code_subtools.bash.template'))
   assert.ok(guide.includes('"label":"List files"'))
   assert.ok(guide.includes('"command":"ls -la"'))
-  assert.ok(!guide.includes('web_search: Search the web.'))
+  assert.ok(guide.includes('Array and loop:'))
+  assert.ok(guide.includes('return out.map(r => r.path)'))
   assert.ok(!guide.includes('declare const tools'))
   assert.ok(guide.length > schema.description.length)
   console.log('guide: rules longer than tool description')
@@ -201,14 +203,7 @@ const webDefinition = { name: 'web_search', description: 'Search the web. Return
   const transport = executor.requirePtcTransport()
   await assert.rejects(() => transport.execute({ code: 5, description: 'x' }, toolExec()), /invalid arguments/)
   await assert.rejects(() => transport.execute({ code: 'return 1' }, toolExec()), /invalid arguments/)
-  const { ctx: pyCtx, runtime: pyRuntime } = harness()
-  pyRuntime.language = 'python'
-  const pyExecutor = new plugin.RunCodeItselfExecutor(pyCtx, {})
-  await assert.rejects(
-    () => pyExecutor.requirePtcTransport().execute({ code: 'return 1', description: 'python' }, toolExec()),
-    /TypeScript PTC only/,
-  )
-  console.log('invalid arguments and Python rejection')
+  console.log('invalid arguments: still rejected by the transport')
 }
 
 // --- preset mount ----------------------------------------------------------

@@ -24,6 +24,10 @@ DSH PTC 的 Data-Code Separation 插件。
 
     {"code":"const args = run_code_subtools.bash.template; args.description = run_code_itself.label; args.command = run_code_itself.command; return await tools.bash(args)","description":"列文件","label":"列文件","command":"ls -la"}
 
+数组与循环：
+
+    {"code":"const out = []; for (const e of run_code_itself.edits) out.push(await tools.edit(e)); return out.map(r => r.path)","description":"批量编辑","edits":[{"file_path":"a.ts","old_string":"old","new_string":"new"},{"file_path":"b.ts","old_string":"old2","new_string":"new2"}]}
+
 run_code_subtools 是普通 JSON；所有可见工具都在里面，包括没有列在提示词里的工具。可以用 Object.keys(run_code_subtools) 或打印某个条目。
 
 模板是结构骨架：必填字段给出简单空占位，有 schema 默认值的选填字段会带上默认值。复杂 enum、union、嵌套 required 的值不做猜测；在代码里填写，由工具 schema 校验。
@@ -33,7 +37,7 @@ run_code_subtools 是普通 JSON；所有可见工具都在里面，包括没有
 系统提示词包含：
 
 - Data-Code Separation 规则；
-- 常用工具签名：bash、read、write、edit、glob、grep；
+- 常用工具签名：bash、read、write、edit、glob、grep、read_image；
 - 隐藏工具说明。
 
 run_code 工具描述故意很短，但保留了最基本的契约，所以系统规范被抑制时规则不会完全消失。规范段比工具描述长。
@@ -69,7 +73,7 @@ Host 行：
 
 ## 行为与限制
 
-- 只支持 TypeScript PTC；Python PTC 会明确报错。
+- 面向 TypeScript PTC 运行时；插件不导入、也不切换到 Python PTC 运行时。
 - 插件不做 Code-Data Separation 的硬拦截；任意 TypeScript 仍可在代码里构造参数对象，合规性取决于模型。
 - 小范围跨模型观察：OpenAI、Google 模型能按规范工作；DeepSeek-flash 在复杂任务下回退到内联。
 - 如果需要确定性拦截，应使用运行时 provenance 或无代码管道；本插件没有实现。

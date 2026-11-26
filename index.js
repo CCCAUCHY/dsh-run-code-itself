@@ -32,7 +32,7 @@ export const PROGRAM_TOOL = 'run_code'
 export const PROGRAM_ITSELF = 'run_code_itself'
 export const PROGRAM_SUBTOOLS = 'run_code_subtools'
 /** Tools whose compact signatures stay in the system guide. */
-const COMMON_TOOLS = new Set(['bash', 'read', 'write', 'edit', 'glob', 'grep'])
+const COMMON_TOOLS = new Set(['bash', 'read', 'write', 'edit', 'glob', 'grep', 'read_image'])
 
 /** Tool description: deliberately short; the rules live in the system prompt. */
 const TOOL_DESCRIPTION = 'Run one program against the available tools. code is the body of an async TypeScript function; top-level await and return work, and erasable syntax only is allowed. Put data and every subtool argument in sibling fields of this call; the complete arguments are run_code_itself and the per-tool metadata is run_code_subtools. Never write tools.x({...}) inside code. Follow the Data-Code Separation rules in the system prompt. Only printed or returned output is model-visible; image results attach after the run; nested tools keep their own policies.'
@@ -120,7 +120,6 @@ function signatureFor(definition) {
 export function renderProgramGuide(tools) {
   const common = tools.filter(tool => COMMON_TOOLS.has(tool.name))
   const other = tools.filter(tool => !COMMON_TOOLS.has(tool.name))
-  const hiddenLabel = other.length === 1 ? '1 other tool' : other.length + ' other tools'
   const lines = [
     '## Data-Code Separation',
     '',
@@ -133,33 +132,38 @@ export function renderProgramGuide(tools) {
     '## Program variables',
     '',
     'run_code_itself: the complete arguments of this call, including every sibling field.',
-    'run_code_subtools: one entry per tool, shaped as { description, template, signature }.',
-    'The template is a structural skeleton. Complex enum, union, or nested values must be filled in code and checked against the tool schema.',
+    'run_code_subtools: one entry per tool.',
     '',
-    '## How to call a tool',
+    '## Template structure',
+    '',
+    'run_code_subtools.<tool> = { description, template, signature }.',
+    'template contains required fields with empty placeholders and optional fields with schema defaults; it is a structural skeleton, not a validated sample. Complex enum, union, or nested values must be filled in code.',
+    '',
+    '## Examples',
     '',
     'Sibling field:',
     '{"code":"return await tools.bash(run_code_itself.bash)","description":"List files","bash":{"description":"List files","command":"ls -la"}}',
     '',
-    'Template (sibling fields are arbitrary; this example uses label and command):',
+    'Template (this example uses label and command):',
     '{"code":"const args = run_code_subtools.bash.template; args.description = run_code_itself.label; args.command = run_code_itself.command; return await tools.bash(args)","description":"List files","label":"List files","command":"ls -la"}',
+    '',
+    'Array and loop:',
+    '{"code":"const out = []; for (const e of run_code_itself.edits) out.push(await tools.edit(e)); return out.map(r => r.path)","description":"Apply edits","edits":[{"file_path":"a.ts","old_string":"old","new_string":"new"},{"file_path":"b.ts","old_string":"old2","new_string":"new2"}]}',
     '',
     'Never write tools.bash({...}) or tools.x({...}) inside code.',
     '',
-    '## Common tools',
+    '## Tools',
     '',
-    'These are the commonly used tools. Other tools are not listed here.',
+    'Common tools:',
     '',
   ]
   for (const tool of common) {
-    lines.push('- ' + signatureFor(tool) + ': ' + docText(tool.description))
+    lines.push('- ' + signatureFor(tool) + ': ' + firstSentence(tool.description))
   }
-  lines.push(
-    '',
-    '## Hidden tools',
-    '',
-    'All other tools are available in run_code_subtools. There are ' + hiddenLabel + '.',
-  )
+  lines.push('', 'Other tools:', '')
+  for (const tool of other) {
+    lines.push('- ' + signatureFor(tool) + ': ' + firstSentence(tool.description))
+  }
   return lines.join('\n')
 }
 
@@ -237,10 +241,6 @@ export class RunCodeItselfExecutor extends PtcExecutor {
   /** Inject the complete call and all templates before user code. */
   async #execute(transport, args, exec) {
     if (!isObjectRecord(args) || typeof args.code !== 'string') return transport.execute(args, exec)
-    const runtime = this.ctx.get('ptcRuntime')
-    if (runtime !== undefined && runtime.language !== 'typescript') {
-      throw new Error('dsh-run-code-itself supports TypeScript PTC only; Python PTC is not supported.')
-    }
     const subtools = buildSubtools(this.ctx.tools.definitions(exec.agent, exec.toolSet))
     const prelude = [
       declarationFor(PROGRAM_SUBTOOLS, subtools),
