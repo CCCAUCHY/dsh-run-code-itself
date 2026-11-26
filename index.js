@@ -179,7 +179,7 @@ export function renderCompactSdk(tools, options = {}) {
       '',
       '## Hidden tools',
       '',
-      'Every other tool is available. run_code_subtools is the complete JSON object; write code to inspect it with Object.keys(run_code_subtools), or print a named entry to read its description and template. No search API is needed.',
+      'All other tools are available in run_code_subtools. Inspect it with Object.keys(run_code_subtools) or print a named entry.',
     )
     return lines.join('\n')
   }

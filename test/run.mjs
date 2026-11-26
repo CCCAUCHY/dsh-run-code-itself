@@ -408,7 +408,7 @@ console.log('')
   assert.ok(rulesSdk.includes('## Common tools'))
   assert.ok(rulesSdk.includes('bash('))
   assert.ok(!rulesSdk.includes('web_search'))
-  assert.ok(rulesSdk.includes('run_code_subtools is the complete JSON object'))
+  assert.ok(rulesSdk.includes('All other tools are available in run_code_subtools'))
   assert.ok(!rulesSdk.includes('declare const tools'))
   const systemExecutor = new plugin.RunCodeItselfExecutor(toolCtx, { promptMode: 'system', sdkStyle: 'rules' })
   const systemSchema = systemExecutor.describe([bashDefinition, webDefinition]).schemas[0]
