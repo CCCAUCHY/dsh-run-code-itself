@@ -31,7 +31,7 @@ export const RUN_CODE_ITSELF = 'run_code_itself'
 const COMMON_TOOLS = new Set(['bash', 'read', 'write', 'edit', 'glob', 'grep'])
 
 /** Short note appended to the run_code description; the hard rules live in the system prompt. */
-const TOOL_NOTE = '\n\nExtra top-level sibling fields are allowed. Inside the program they become parsed values on run_code_itself; the system prompt defines the Code-Data Separation rules.'
+const TOOL_NOTE = '\n\nExtra top-level sibling fields are allowed and become parsed values on run_code_itself.'
 
 /** True for the argument object shape a JSON tool call can produce. */
 function isObjectRecord(value) {
@@ -121,15 +121,21 @@ export function renderCompactSdk(tools) {
   const lines = [
     '## Code-Data Separation',
     '',
-    'This runtime separates code from data. code is program logic; data and subtool arguments are sibling JSON fields of the run_code call, read inside the program as parsed values on run_code_itself.',
+    'code is program logic. Keep data out of it: use free-form sibling fields, read inside the program as run_code_itself.<field>, or the preloaded subtool template.',
     '',
-    '1. **Subtool arguments must be data, not an inline JSON literal.** Use a free-form sibling field (bash: {...}) and call tools.bash(run_code_itself.bash), or fill and pass run_code_subtools.<tool>.template directly. Never write tools.x({...}) with an inline object literal.',
-    '2. **Minimize escaping inside code.** code is a JSON string; every quote, backslash, or newline inside it needs escaping. Move a value into a sibling field when that reduces escaping in code; keep it inline when inlining costs nothing extra.',
-    '3. **Decide by actual escaping cost, not by type or size.** A short value may stay inline; a multiline string, JSON structure, or subtool arguments belong in a field. Rule 1 always applies to subtool JSON.',
+    '1. **Do not inline subtool JSON.** Use a free-form sibling field (bash: {...}) and call tools.bash(run_code_itself.bash), or fill and pass run_code_subtools.<tool>.template. Never write tools.x({...}).',
+    '2. **Minimize escaping in code.** Move a value into a sibling field when that removes quotes, backslashes, newlines, or a large literal; keep it inline when it costs nothing.',
+    '3. **Decide by actual escaping cost, not by type or size.**',
     '',
-    'Do not JSON.stringify or JSON.parse sibling values; do not declare run_code_itself.',
+    '**Subtool metadata**',
     '',
-    'run_code_subtools.<tool> is an object with description and template. The template contains every required field (empty) and optional fields that have a schema default. After filling the required fields it is directly usable as the tool argument object; do not pass run_code_subtools.<tool> itself. Print run_code_subtools.<tool> to see both.',
+    'run_code_subtools.<tool> = { description, template }.',
+    '- description: full tool description.',
+    '- template: required fields empty, optional fields with schema defaults; fill required values and pass it directly to tools.<tool>.',
+    '- Do not pass run_code_subtools.<tool> itself as arguments.',
+    '- Print run_code_subtools.<tool> to inspect both.',
+    '',
+    'Do not JSON.stringify or JSON.parse sibling values; do not declare run_code_itself or run_code_subtools.',
     '',
     '## SDK',
     '',
@@ -140,6 +146,11 @@ export function renderCompactSdk(tools) {
     '  description: string;',
     '  [key: string]: JsonValue;',
     '}',
+    '',
+    'declare const run_code_subtools: Record<string, {',
+    '  description: string;',
+    '  template: Record<string, JsonValue>;',
+    '}>',
     '',
     'interface ToolArgsMap {',
   ]
@@ -159,15 +170,14 @@ export function renderCompactSdk(tools) {
     '',
     'declare const tools: { [K in keyof ToolArgsMap]: (args: ToolArgsMap[K]) => Promise<ToolOutputMap[K]> }',
     '',
-    '// Code-Data Separation example:',
-    '// The bash sibling field is a free-form object; its required keys come from run_code_subtools.bash.template;',
-    '// optional keys may be omitted to use the tool defaults; at runtime it is read as run_code_itself.bash:',
+    '// Sibling field:',
     '// run_code({',
     '//   code: "return await tools.bash(run_code_itself.bash)",',
     '//   description: "List files",',
     '//   bash: { description: "List files", command: "ls -la" },',
     '// })',
-    '// Or use the template variable directly:',
+    '//',
+    '// Template variable:',
     '// const args = run_code_subtools.bash.template',
     '// args.description = "List files"; args.command = "ls -la"',
     '// return await tools.bash(args)',
