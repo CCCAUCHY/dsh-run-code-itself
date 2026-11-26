@@ -26,11 +26,11 @@ Inside the program:
 - `run_code_itself.rows`, `run_code_itself.regex`, etc. are already parsed JavaScript values;
 - do not declare `run_code_itself` yourself.
 
-The model-facing `run_code` schema is open (`additionalProperties: true`) and its description explains the contract.
+The model-facing `run_code` schema is open (`additionalProperties: true`). The hard rules live in the system prompt's **Code-Data Separation** section; the tool description only notes that sibling fields are allowed and become `run_code_itself`.
 
-## Passing data and subtool arguments
+## Code-Data Separation
 
-Extra sibling fields are values in the same JSON object as `code` — write them as JSON, not as a stringified JSON string:
+`code` is program logic. Data and subtool arguments are sibling JSON fields of the `run_code` call; inside the program they are parsed values on `run_code_itself`. Write them as JSON, not as a stringified JSON string:
 
 ```json
 {"code":"return run_code_itself.rows.length","description":"Count rows","rows":[{"id":"AB-123-4567"}]}
@@ -64,7 +64,7 @@ Use the template's keys to build the nested sibling field; no extra syntax:
 
 ## On-demand tool documentation
 
-The system prompt shows full definitions for the common tools (`bash`, `read`, `write`, `edit`, `glob`, `grep`) and a name/description index for all other visible tools. Every tool remains callable; for a hidden tool, print its template first to get the signature, parameters, and output, then call it with `tools.name` and a nested sibling field.
+The system prompt renders a compact SDK with full TypeScript declarations for the common tools (`bash`, `read`, `write`, `edit`, `glob`, `grep`) and a name/description index for all other visible tools. Every tool remains callable; for a hidden tool, print its template first to get the signature, parameters, and output, then call it with `tools.name` and a nested sibling field.
 
 ## Metaprogramming
 
@@ -80,7 +80,7 @@ The system prompt shows full definitions for the common tools (`bash`, `read`, `
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # or a packed tarball:
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.2.3.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.3.0.tgz
 ```
 
 Or use **Plugins → Add plugin** in the DSH Web UI and point it at the directory or tarball. The CLI only installs the package; the Web UI also selects the bundle (its patch is empty, so this only affects the Plugins listing).

@@ -27,37 +27,11 @@ export const Config = z.object({
 /** The program-visible preset variable. */
 export const RUN_CODE_ITSELF = 'run_code_itself'
 
-/** Backtick, kept as a code point so this file needs no template literals. */
-const TICK = '\x60'
-
 /** Tools whose full definitions stay in the system prompt. */
 const COMMON_TOOLS = new Set(['bash', 'read', 'write', 'edit', 'glob', 'grep'])
 
-/** One-line note placed immediately after the base description. */
-const EXTRA_FIELDS_NOTE = (
-  'The parameter schema sets @additionalProperties: true@: extra sibling fields are allowed and MUST be used for subtool JSON and escape-prone values.'
-).replaceAll('@', TICK)
-
-/** Model-facing contract appended after the base description. */
-export const GUIDANCE = [
-  '**Preset variables**',
-  '',
-  '@run_code_itself@ is the complete arguments object of this @run_code@ call; extra sibling fields are already parsed JavaScript values. @run_code_templates@ contains every visible tool template; print @run_code_templates.<tool>@ for its description, signature, parameters, output, and sample.',
-  '',
-  '**Sibling fields — hard rules**',
-  '',
-  '1. **Subtool JSON MUST be a sibling field.** Put the argument object in a field named after the tool (@bash@, @read@, @write@, ...) and call @tools.bash(run_code_itself.bash)@. Never write @tools.x({...})@ inline, regardless of payload size.',
-  '2. **Values that need escaping MUST be sibling fields:** multi-line text, regex or paths with backslashes, JSON arrays/objects, templates.',
-  '3. **Other values:** use a sibling field when it reduces escaping or is long; simple literals, numbers, status strings, and control flow stay in @code@.',
-  '',
-  'Do not @JSON.stringify@ or @JSON.parse@ sibling values; do not declare the preset variables.',
-  '',
-  '**Metaprogramming**',
-  '',
-  '@run_code_itself.code@ is the exact source; read, split, or @eval@ it. Use @run_code_templates@ to look up tool arguments.',
-  '',
-  'Example: {"code":"return await tools.bash(run_code_itself.bash)","description":"List files","bash":{"command":"ls -la","description":"List files"}}',
-].join('\n').replaceAll('@', TICK)
+/** Short note appended to the run_code description; the hard rules live in the system prompt. */
+const TOOL_NOTE = '\n\nExtra top-level sibling fields are allowed. Inside the program they become parsed values on run_code_itself; the system prompt defines the Code-Data Separation rules.'
 
 /** True for the argument object shape a JSON tool call can produce. */
 function isObjectRecord(value) {
@@ -154,38 +128,68 @@ function firstSentence(text) {
  * @param tools - visible capability definitions.
  * @returns the generated system-prompt section.
  */
+/** Escape one-line JSDoc text. */
+function docText(text) {
+  return (typeof text === 'string' ? text : '').replace(/\*\//g, '* /').replace(/\s+/g, ' ').trim()
+}
+
 export function renderCompactSdk(tools) {
   const common = tools.filter(tool => COMMON_TOOLS.has(tool.name))
   const other = tools.filter(tool => !COMMON_TOOLS.has(tool.name))
   const lines = [
-    '## Tools',
+    '## Code-Data Separation',
     '',
-    'All tools are callable as await tools.name(args). All argument templates are preloaded in run_code_templates; print one with console.log(run_code_templates.<tool>) when you need its description, signature, parameters, output, or sample.',
+    'This runtime separates code from data. code is program logic; data and subtool arguments are sibling JSON fields of the run_code call, read inside the program as parsed values on run_code_itself.',
+    '',
+    '1. **Subtool JSON MUST be a sibling field.** Put the argument object in a field named after the tool (bash, read, ...) and call tools.bash(run_code_itself.bash). Never write tools.x({...}) inline, regardless of payload size.',
+    '2. **Escape-prone values MUST be sibling fields:** multi-line text, regex or paths with backslashes, JSON arrays/objects, templates.',
+    '3. **Other values:** use a sibling field when it reduces escaping or is long; simple literals, numbers, status strings, and control flow stay in code.',
+    '',
+    'Do not JSON.stringify or JSON.parse sibling values; do not declare run_code_itself.',
+    '',
+    'All tool templates are preloaded in run_code_templates; print run_code_templates.<tool> for its description, signature, parameters, output, and sample.',
+    '',
+    '## SDK',
     '',
     'type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue }',
     '',
-    '### Common tools (full definitions)',
+    'declare const run_code_itself: {',
+    '  code: string;',
+    '  description: string;',
+    '  [key: string]: JsonValue;',
+    '}',
     '',
+    'interface ToolArgsMap {',
   ]
   for (const tool of common) {
-    lines.push(JSON.stringify({
-      name: tool.name,
-      description: tool.description,
-      signature: signatureFor(tool),
-      parameters: tool.parameters,
-      output: tool.output === undefined ? undefined : tool.output.schema,
-    }))
+    const description = docText(tool.description)
+    if (description !== '') lines.push('  /** ' + description + ' */')
+    const parameters = isObjectRecord(tool.parameters) ? tool.parameters : { type: 'object', properties: {} }
+    lines.push('  ' + JSON.stringify(tool.name) + ': ' + jsonSchemaToTs(parameters) + ';')
   }
-  lines.push('', '### Other tools (name, description; print the template for parameters)', '')
-  for (const tool of other) lines.push('- ' + tool.name + ': ' + firstSentence(tool.description))
+  lines.push('}', '', 'interface ToolOutputMap {')
+  for (const tool of common) {
+    const output = tool.output !== undefined && isObjectRecord(tool.output.schema) ? tool.output.schema : {}
+    lines.push('  ' + JSON.stringify(tool.name) + ': ' + jsonSchemaToTs(output) + ';')
+  }
   lines.push(
+    '}',
     '',
-    '### Calling',
+    'declare const tools: { [K in keyof ToolArgsMap]: (args: ToolArgsMap[K]) => Promise<ToolOutputMap[K]> }',
     '',
-    '- Put subtool JSON in a sibling field (bash, read, ...) and call tools.bash(run_code_itself.bash).',
-    '- run_code_templates is preloaded; print run_code_templates.<tool> for argument keys and samples.',
-    '- run_code_itself contains the complete call arguments.',
+    '// Code-Data Separation example:',
+    '// run_code({',
+    '//   code: "return await tools.bash(run_code_itself.bash)",',
+    '//   description: "List files",',
+    '//   bash: { command: "ls -la", description: "List files" },',
+    '// })',
+    '',
+    '## Other tools',
+    '',
+    'These tools are callable but not declared in the compact SDK. Print their template for signature, parameters, and output:',
+    '',
   )
+  for (const tool of other) lines.push('- ' + tool.name + ': ' + firstSentence(tool.description))
   return lines.join('\n')
 }
 
@@ -251,7 +255,7 @@ export class RunCodeItselfExecutor extends PtcExecutor {
         const code = isObjectRecord(properties.code) ? properties.code : undefined
         return {
           ...schema,
-          description: schema.description + '\n\n' + EXTRA_FIELDS_NOTE + '\n\n' + GUIDANCE,
+          description: schema.description + TOOL_NOTE,
           parameters: {
             ...parameters,
             additionalProperties: true,
@@ -261,7 +265,7 @@ export class RunCodeItselfExecutor extends PtcExecutor {
                 code: {
                   ...code,
                   description: (typeof code.description === 'string' ? code.description + ' ' : '')
-                    + 'Program logic only: put subtool JSON and escape-prone values in extra sibling fields. run_code_itself.code is this exact source text and can be inspected or evaluated for metaprogramming.',
+                    + 'Extra sibling fields are parsed values on run_code_itself; run_code_itself.code is this exact source text and can be inspected or evaluated for metaprogramming.',
                 },
               },
             },

@@ -24,11 +24,11 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 - `run_code_itself.rows`、`run_code_itself.regex` 等额外字段已经是解析后的 JavaScript 值；
 - 不要在程序里再次声明 `run_code_itself`。
 
-模型看到的 `run_code` 参数 schema 会把对象标记为可接受额外字段，并在工具说明里得到同样的用法说明。
+模型看到的 `run_code` 参数 schema 会把对象标记为可接受额外字段；硬规则放在系统提示词的 **Code-Data Separation** 段落里，工具描述只说明兄弟字段会被注入 `run_code_itself`。
 
-## 数据与子工具参数
+## Code-Data Separation
 
-额外兄弟字段和 `code` 在同一个 JSON 对象里，值直接写 JSON，不要写成“JSON 字符串”：
+`code` 只放程序逻辑。数据和子工具参数是 `run_code` 调用的兄弟 JSON 字段，程序里以解析好的值挂在 `run_code_itself` 上。值直接写 JSON，不要写成“JSON 字符串”：
 
 ```json
 {"code":"return run_code_itself.rows.length","description":"数行数","rows":[{"id":"AB-123-4567"}]}
@@ -60,7 +60,7 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 
 ## 按需工具文档
 
-系统提示词里只展开常用工具（`bash`、`read`、`write`、`edit`、`glob`、`grep`）的完整定义，其余可见工具只列名字和一句话描述。所有工具仍然可调用；对未展开的工具，先打印模板拿到签名、参数和输出，再用 `tools.name` 和嵌套兄弟字段调用。
+系统提示词里渲染一份紧凑 SDK：常用工具（`bash`、`read`、`write`、`edit`、`glob`、`grep`）有完整 TypeScript 声明，其余可见工具只列名字和一句话描述。所有工具仍然可调用；对未展开的工具，先打印模板拿到签名、参数和输出，再用 `tools.name` 和嵌套兄弟字段调用。
 
 ## 元编程
 
@@ -71,7 +71,7 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # 或 tgz：
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.2.3.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.3.0.tgz
 ```
 
 也可以在 **插件** 页面选择 **添加插件**，指向目录或 tgz。命令行只安装包；UI 的 **添加插件** 还会把 bundle 选进 profile（bundle 的补丁是空的，所以只影响插件页的显示）。

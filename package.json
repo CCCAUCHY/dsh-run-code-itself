@@ -1,6 +1,6 @@
 {
   "name": "dsh-run-code-itself",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "Expose the complete run_code tool-call arguments to DSH PTC programs as run_code_itself, with unescaped extra fields.",
   "type": "module",
   "license": "MIT",
