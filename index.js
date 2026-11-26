@@ -58,7 +58,6 @@ export function declarationFor(payload) {
 /** Empty placeholder for one JSON Schema property. */
 function emptyValue(property) {
   if (Object.prototype.hasOwnProperty.call(property, 'const')) return property.const
-  if (Array.isArray(property.enum) && property.enum.length > 0) return property.enum[0]
   switch (property.type) {
     case 'string': return ''
     case 'number': return 0
@@ -71,26 +70,33 @@ function emptyValue(property) {
 }
 
 /**
- * Build the minimal argument template for each visible tool: all required
- * fields present with empty placeholders, and the full tool description in
- * the description property when the tool has one.
+ * Build the per-tool metadata wrapper: the full tool description plus a
+ * template containing every field (required empty, optional default value).
  * @param definitions - visible tool definitions.
- * @returns minimal argument objects keyed by tool name.
+ * @returns wrapper objects keyed by tool name.
  */
-export function buildTemplates(definitions) {
-  const templates = Object.create(null)
+export function buildSubtools(definitions) {
+  const subtools = Object.create(null)
   for (const definition of definitions) {
     const parameters = isObjectRecord(definition.parameters) ? definition.parameters : {}
     const properties = isObjectRecord(parameters.properties) ? parameters.properties : {}
     const required = Array.isArray(parameters.required) ? parameters.required : []
     const template = Object.create(null)
-    for (const key of required) {
-      const property = properties[key]
-      template[key] = isObjectRecord(property) ? emptyValue(property) : ''
+    for (const [key, property] of Object.entries(properties)) {
+      if (!isObjectRecord(property)) continue
+      if (required.includes(key)) template[key] = emptyValue(property)
+      else if (Object.prototype.hasOwnProperty.call(property, 'default')) template[key] = property.default
+      else template[key] = emptyValue(property)
     }
-    templates[definition.name] = template
+    for (const key of required) {
+      if (!Object.prototype.hasOwnProperty.call(template, key)) template[key] = ''
+    }
+    subtools[definition.name] = {
+      description: definition.description === undefined ? '' : String(definition.description),
+      template,
+    }
   }
-  return templates
+  return subtools
 }
 
 /** First sentence of a tool description, for the compact index. */
@@ -125,7 +131,7 @@ export function renderCompactSdk(tools) {
     '',
     'Do not JSON.stringify or JSON.parse sibling values; do not declare run_code_itself.',
     '',
-    'All tool templates are preloaded in run_code_templates as minimal argument objects: every required field is present with an empty value. Fill the values and pass the object as the tool sibling field; print run_code_templates.<tool> to see it.',
+    'run_code_subtools.<tool> holds a description and a template. The template contains every field: required fields are empty, optional fields use their schema default or an empty placeholder. Copy the template into the tool sibling field and fill the required values; print run_code_subtools.<tool> to see both.',
     '',
     '## SDK',
     '',
@@ -156,8 +162,8 @@ export function renderCompactSdk(tools) {
     'declare const tools: { [K in keyof ToolArgsMap]: (args: ToolArgsMap[K]) => Promise<ToolOutputMap[K]> }',
     '',
     '// Code-Data Separation example:',
-    '// The bash sibling field is run_code_templates.bash with values filled;',
-    '// at runtime it is read as run_code_itself.bash:',
+    '// The bash sibling field is a free-form object; its required keys come from run_code_subtools.bash.template;',
+    '// optional keys may be omitted to use the tool defaults; at runtime it is read as run_code_itself.bash:',
     '// run_code({',
     '//   code: "return await tools.bash(run_code_itself.bash)",',
     '//   description: "List files",',
@@ -166,10 +172,10 @@ export function renderCompactSdk(tools) {
     '',
     '## Other tools',
     '',
-    'These tools are callable but not declared in the compact SDK. Print their template for the required argument fields:',
+    'These tools are callable but not declared in the compact SDK. Print run_code_subtools.<tool> for its full description and template:',
     '',
   )
-  for (const tool of other) lines.push('- ' + tool.name + ': ' + docText(tool.description))
+  for (const tool of other) lines.push('- ' + tool.name + ': ' + firstSentence(tool.description))
   return lines.join('\n')
 }
 
@@ -256,7 +262,7 @@ export class RunCodeItselfExecutor extends PtcExecutor {
   }
 
   /**
-   * Inject run_code_itself and all tool templates.
+   * Inject run_code_itself and the run_code_subtools wrapper.
    * @param transport - the unwrapped run_code definition.
    * @param args - parsed model arguments, possibly with sibling fields.
    * @param exec - the tool run context.
@@ -264,9 +270,9 @@ export class RunCodeItselfExecutor extends PtcExecutor {
    */
   async #execute(transport, args, exec) {
     if (!isObjectRecord(args) || typeof args.code !== 'string') return transport.execute(args, exec)
-    const templates = buildTemplates(this.ctx.tools.schemas(exec.agent, exec.toolSet))
+    const subtools = buildSubtools(this.ctx.tools.definitions(exec.agent, exec.toolSet))
     const prelude = [
-      'const run_code_templates = ' + jsonLiteral(templates) + ';',
+      'const run_code_subtools = ' + jsonLiteral(subtools) + ';',
       declarationFor(args),
     ].join('\n')
     return transport.execute({ ...args, code: prelude + '\n' + args.code }, exec)

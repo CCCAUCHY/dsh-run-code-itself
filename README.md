@@ -46,31 +46,43 @@ Prepare nested tool arguments the same way:
 {"code":"const r = await tools.bash(run_code_itself.bash); return r.stdout.text","description":"List files","bash":{"description":"List files","command":"ls -la"}}
 ```
 
-## Tool templates
+## Subtool metadata
 
-Every visible tool's template is preloaded in `run_code_templates` as a minimal argument object: all required fields with empty values. Print one:
-
-```json
-{"code":"return run_code_templates.bash","description":"Read the bash template"}
-```
-
-Result:
+Every visible tool has one entry in `run_code_subtools`:
 
 ```json
-{"description":"","command":""}
+{
+  "description": "full tool description",
+  "template": {
+    "required_field": "",
+    "optional_field": "schema default or empty placeholder"
+  }
+}
 ```
 
-The example below copies this template into the `bash` sibling field and fills both values:
+The template contains every parameter: required fields are empty, optional fields use their schema default or an empty placeholder. Print one:
+
+```json
+{"code":"return run_code_subtools.bash","description":"Read the bash metadata"}
+```
+
+Result (abbreviated):
+
+```json
+{"description":"Execute a shell command and return stdout/stderr.","template":{"description":"","command":"","timeoutMs":0,"workdir":"","run_in_background":false,"sandbox_permissions":"","justification":""}}
+```
+
+`run_code_subtools.bash` is only the preloaded reference. The `bash` sibling field is a free-form field you write into the `run_code` call; at runtime it is `run_code_itself.bash`. Copy the template, fill the values you need, and omit optional fields when they should use the tool's runtime default:
 
 ```json
 {"code":"return await tools.bash(run_code_itself.bash)","description":"List files","bash":{"description":"List files","command":"ls -la"}}
 ```
 
-`run_code_templates.bash` is only the preloaded reference. The `bash` sibling field you write is parsed into `run_code_itself.bash` at runtime; the program never calls `run_code_templates.bash` directly.
+The program never calls `run_code_subtools.bash` directly.
 
 ## On-demand tool documentation
 
-The system prompt renders a compact SDK with full TypeScript declarations for the common tools (`bash`, `read`, `write`, `edit`, `glob`, `grep`) and a full-description index for all other visible tools. Every tool remains callable; for a hidden tool, print its minimal template first to get the required fields, then call it with `tools.name` and a nested sibling field.
+The system prompt renders a compact SDK with full TypeScript declarations for the common tools (`bash`, `read`, `write`, `edit`, `glob`, `grep`) and a one-line index for all other visible tools. Every tool remains callable; for a hidden tool, print `run_code_subtools.<tool>` first for its full description and template, then call it with `tools.name` and a nested sibling field.
 
 ## Metaprogramming
 
@@ -86,7 +98,7 @@ The system prompt renders a compact SDK with full TypeScript declarations for th
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # or a packed tarball:
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.3.3.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.4.0.tgz
 ```
 
 Or use **Plugins → Add plugin** in the DSH Web UI and point it at the directory or tarball. The CLI only installs the package; the Web UI also selects the bundle (its patch is empty, so this only affects the Plugins listing).

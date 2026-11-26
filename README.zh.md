@@ -42,31 +42,43 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 {"code":"const r = await tools.bash(run_code_itself.bash); return r.stdout.text","description":"列文件","bash":{"description":"列文件","command":"ls -la"}}
 ```
 
-## 工具模板
+## 子工具元数据
 
-所有可见工具的模板都预加载在 `run_code_templates` 里，是最小参数对象：包含全部必填字段，值全部为空。打印其中一个：
-
-```json
-{"code":"return run_code_templates.bash","description":"查看 bash 模板"}
-```
-
-结果：
+每个可见工具在 `run_code_subtools` 里有一个条目：
 
 ```json
-{"description":"","command":""}
+{
+  "description": "完整工具描述",
+  "template": {
+    "required_field": "",
+    "optional_field": "默认值或空占位"
+  }
+}
 ```
 
-下面的示例把这个模板复制进 `bash` 兄弟字段，并填入两个值：
+模板包含全部参数：必填为空，选填用 schema 默认值或空占位。打印其中一个：
+
+```json
+{"code":"return run_code_subtools.bash","description":"查看 bash 元数据"}
+```
+
+结果（截断）：
+
+```json
+{"description":"Execute a shell command and return stdout/stderr.","template":{"description":"","command":"","timeoutMs":0,"workdir":"","run_in_background":false,"sandbox_permissions":"","justification":""}}
+```
+
+`run_code_subtools.bash` 只是预加载的参考。写进 `run_code` 调用的 `bash` 兄弟字段是自由 JSON，运行时解析成 `run_code_itself.bash`。复制模板、填需要的值；不需要的选填字段可以删掉，让工具使用运行时默认值：
 
 ```json
 {"code":"return await tools.bash(run_code_itself.bash)","description":"列文件","bash":{"description":"列文件","command":"ls -la"}}
 ```
 
-`run_code_templates.bash` 只是预加载的参考模板。写进调用的 `bash` 兄弟字段在运行时解析成 `run_code_itself.bash`，程序不会直接调用 `run_code_templates.bash`。
+程序不会直接调用 `run_code_subtools.bash`。
 
 ## 按需工具文档
 
-系统提示词里渲染一份紧凑 SDK：常用工具（`bash`、`read`、`write`、`edit`、`glob`、`grep`）有完整 TypeScript 声明，其余可见工具列在带完整描述的索引里。所有工具仍然可调用；对未展开的工具，先打印最小模板拿到必填字段，再用 `tools.name` 和嵌套兄弟字段调用。
+系统提示词里渲染一份紧凑 SDK：常用工具（`bash`、`read`、`write`、`edit`、`glob`、`grep`）有完整 TypeScript 声明，其余可见工具只列名字和一句话描述。所有工具仍然可调用；对未展开的工具，先打印 `run_code_subtools.<tool>` 拿到完整描述和模板，再用 `tools.name` 和嵌套兄弟字段调用。
 
 ## 元编程
 
@@ -77,7 +89,7 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # 或 tgz：
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.3.3.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.4.0.tgz
 ```
 
 也可以在 **插件** 页面选择 **添加插件**，指向目录或 tgz。命令行只安装包；UI 的 **添加插件** 还会把 bundle 选进 profile（bundle 的补丁是空的，所以只影响插件页的显示）。

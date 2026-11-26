@@ -96,7 +96,7 @@ console.log('schema: open parameters and guidance present')
     regex: '\\b\\d{3}-\\d{4}\\b',
     rows,
   })
-  assert.ok(program.startsWith('const run_code_templates = '))
+  assert.ok(program.startsWith('const run_code_subtools = '))
   assert.ok(program.includes('const run_code_itself = {'))
   assert.ok(program.includes('\\\\b\\\\d{3}-\\\\d{4}\\\\b'))
   assert.deepEqual(value, [{ id: 'AB-123-4567' }])
@@ -273,8 +273,9 @@ console.log('')
       },
     },
   }
-  const templates = plugin.buildTemplates([bashDefinition])
-  assert.deepEqual({ ...templates.bash }, { description: '', command: '' })
+  const subtools = plugin.buildSubtools([bashDefinition])
+  assert.equal(subtools.bash.description, 'Execute a shell command and return stdout/stderr.')
+  assert.deepEqual({ ...subtools.bash.template }, { description: '', command: '', timeoutMs: 0 })
   const readDefinition = {
     name: 'read',
     description: 'Read a UTF-8 text file and return line-numbered content.',
@@ -285,7 +286,18 @@ console.log('')
     },
     output: { schema: {} },
   }
-  assert.deepEqual({ ...plugin.buildTemplates([readDefinition]).read }, { file_path: '' })
+  assert.deepEqual({ ...plugin.buildSubtools([readDefinition]).read.template }, { file_path: '', offset: 0 })
+  const defaultDefinition = {
+    name: 'demo',
+    description: 'Demo tool.',
+    parameters: {
+      type: 'object',
+      properties: { required: { type: 'string' }, optional: { type: 'number', default: 7 } },
+      required: ['required'],
+    },
+    output: { schema: {} },
+  }
+  assert.deepEqual({ ...plugin.buildSubtools([defaultDefinition]).demo.template }, { required: '', optional: 7 })
 
   const webDefinition = { name: 'web_search', description: 'Search the web. Returns results.', parameters: {}, output: { schema: {} } }
   const sdk = plugin.renderCompactSdk([bashDefinition, webDefinition])
@@ -294,9 +306,8 @@ console.log('')
   assert.ok(sdk.includes('declare const run_code_itself'))
   assert.ok(sdk.includes('interface ToolArgsMap'))
   assert.ok(sdk.includes('tools.bash(run_code_itself.bash)'))
-  assert.ok(sdk.includes('web_search: Search the web. Returns results.'))
-  assert.ok(!sdk.includes('web_search: Search the web.\n'))
-  assert.ok(sdk.includes('run_code_templates'))
+  assert.ok(sdk.includes('web_search: Search the web.'))
+  assert.ok(sdk.includes('run_code_subtools'))
 
   const { ctx, programs, tools } = harness()
   tools.schemas = () => [bashSchema]
@@ -305,18 +316,20 @@ console.log('')
   executor.programs = programs
   const transport = executor.requirePtcTransport()
   await transport.execute({
-    code: 'return { template: run_code_templates.bash, arg: run_code_itself.bash }',
+    code: 'return { description: run_code_subtools.bash.description, template: run_code_subtools.bash.template, arg: run_code_itself.bash }',
     description: 'Template test',
     bash: { command: 'ls -la', description: 'List files' },
   }, toolExec())
   const program = programs.at(-1)
-  assert.ok(program.includes('const run_code_templates = '))
+  assert.ok(program.includes('const run_code_subtools = '))
   assert.ok(program.includes('const run_code_itself = '))
   assert.ok(!program.includes('run_code_call'))
+  assert.ok(!program.includes('run_code_templates'))
   const fn = new AsyncFunction(program)
   const value = await fn()
-  assert.deepEqual(value.template, { description: '', command: '' })
+  assert.equal(value.description, 'Execute a shell command and return stdout/stderr.')
+  assert.deepEqual(value.template, { description: '', command: '', timeoutMs: 0 })
   assert.deepEqual(value.arg, { command: 'ls -la', description: 'List files' })
-  console.log('templates: preloaded; only run_code_itself and run_code_templates')
+  console.log('subtools: description and full template preloaded; only run_code_itself and run_code_subtools')
 }
 console.log('All checks passed')
