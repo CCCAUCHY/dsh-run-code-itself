@@ -106,7 +106,7 @@ The system prompt renders a compact SDK with full TypeScript declarations for th
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # or a packed tarball:
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.4.5.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.4.6.tgz
 ```
 
 Or use **Plugins → Add plugin** in the DSH Web UI and point it at the directory or tarball. The CLI only installs the package; the Web UI also selects the bundle (its patch is empty, so this only affects the Plugins listing).
@@ -178,7 +178,9 @@ If a future DSH version changes the internal `requirePtcTransport` hook, the plu
 - id: persona
   name: '@deepseek-ai/dsh-persona'
   config:
-    prefix: You are a helpful assistant.
+    prefix: |
+      You are a helpful assistant.
+      You must follow the run_code usage rules in the run_code tool description.
     complete: true
     includeRuntimeContext: false
 ```
@@ -199,7 +201,7 @@ Result:
 
 - system message: the persona prefix only;
 - user reminders: AGENTS.md, skills, runtime context, and time unchanged;
-- tools array: only `run_code`, whose description contains Code-Data Separation and all tool descriptions;
+- tools array: only `run_code`, whose description is ordered as: run_code base → tool list → run_code usage rules;
 - no system SDK section and no PTC-only section.
 
 `promptMode: tool` drops both `tools:ptc-only` and `tools:sdk`. The tools array already sends only `run_code`, so the PTC-only instruction is redundant. The base `run_code` description is adjusted to point at the tool list in that same description.

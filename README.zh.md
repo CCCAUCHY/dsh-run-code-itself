@@ -97,7 +97,7 @@ PTC 模式的 `run_code` 只执行 `code`。要把一份数组、一段正则或
 ```sh
 dsh plugin --profile <profile> add /path/to/dsh-run-code-itself
 # 或 tgz：
-dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.4.5.tgz
+dsh plugin --profile <profile> add /path/to/dsh-run-code-itself-0.4.6.tgz
 ```
 
 也可以在 **插件** 页面选择 **添加插件**，指向目录或 tgz。命令行只安装包；UI 的 **添加插件** 还会把 bundle 选进 profile（bundle 的补丁是空的，所以只影响插件页的显示）。
@@ -148,7 +148,9 @@ bundle 自带的 `cordis.patch.yml` 是**空的**：安装只会把包装进 pro
 - id: persona
   name: '@deepseek-ai/dsh-persona'
   config:
-    prefix: You are a helpful assistant.
+    prefix: |
+      You are a helpful assistant.
+      You must follow the run_code usage rules in the run_code tool description.
     complete: true
     includeRuntimeContext: false
 ```
@@ -169,7 +171,7 @@ bundle 自带的 `cordis.patch.yml` 是**空的**：安装只会把包装进 pro
 
 - system message：只有 persona 前缀；
 - 用户消息里的 AGENTS.md、技能、runtime context、时间保持不变；
-- tools 数组：只有 `run_code`，其 description 包含 Code-Data Separation 和全部工具描述；
+- tools 数组：只有 `run_code`，其 description 顺序是：run_code 本体 → 工具列表 → run_code 使用规范；
 - 没有系统 SDK 段，也没有 PTC-only 段。
 
 `promptMode: tool` 会同时去掉 `tools:ptc-only` 和 `tools:sdk`。工具数组本来就只发 `run_code`，PTC-only 说明是冗余的。基础 `run_code` 描述会被改成指向同一份描述里的工具列表。

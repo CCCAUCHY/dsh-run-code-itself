@@ -216,6 +216,67 @@ export function renderCompactSdk(tools, options = {}) {
   return lines.join('\n')
 }
 
+
+/** Tool list for the run_code description, without usage rules. */
+export function renderToolList(tools, options = {}) {
+  const lines = [
+    '## Tools',
+    '',
+    'All tools are callable as await tools.name(args). run_code_subtools.<tool> has the full description and template.',
+    '',
+  ]
+  for (const tool of tools) {
+    lines.push('- ' + tool.name + ': ' + (options.fullDescriptions ? docText(tool.description) : firstSentence(tool.description)))
+  }
+  return lines.join('\n')
+}
+
+/** The usage rules that belong at the end of the run_code description. */
+export function renderUsageRules() {
+  return [
+    '## run_code Usage Rules',
+    '',
+    'You must follow these rules.',
+    '',
+    'Extra top-level sibling fields are allowed and become parsed values on run_code_itself.',
+    '',
+    '### Code-Data Separation',
+    '',
+    'code is program logic. Keep data out of it: use free-form sibling fields, read inside the program as run_code_itself.<field>, or the preloaded subtool template.',
+    '',
+    '1. **Do not inline subtool JSON.** Use a free-form sibling field (bash: {...}) and call tools.bash(run_code_itself.bash), or fill and pass run_code_subtools.<tool>.template. Never write tools.x({...}).',
+    '2. **Minimize escaping in code.** Move a value into a sibling field when that removes quotes, backslashes, newlines, or a large literal; keep it inline when it costs nothing.',
+    '3. **Decide by actual escaping cost, not by type or size.**',
+    '',
+    '### Subtool metadata',
+    '',
+    'run_code_subtools.<tool> = { description, template }.',
+    '- description: full tool description.',
+    '- template: required fields empty, optional fields with schema defaults; fill required values from run_code_itself and pass it directly to tools.<tool>.',
+    '- Do not pass run_code_subtools.<tool> itself as arguments.',
+    '- Print run_code_subtools.<tool> to inspect both.',
+    '',
+    'Do not JSON.stringify or JSON.parse sibling values; do not declare run_code_itself or run_code_subtools.',
+    '',
+    '### Examples',
+    '',
+    '// Sibling field:',
+    '// run_code({',
+    '//   code: "return await tools.bash(run_code_itself.bash)",',
+    '//   description: "List files",',
+    '//   bash: { description: "List files", command: "ls -la" },',
+    '// })',
+    '//',
+    '// Template variable, values from extra fields:',
+    '// run_code({',
+    '//   code: "const args = run_code_subtools.bash.template; args.description = run_code_itself.label; args.command = run_code_itself.command; return await tools.bash(args)",',
+    '//   description: "List files",',
+    '//   label: "List files",',
+    '//   command: "ls -la",',
+    '// })',
+  ].join('\n')
+}
+
 /**
  * The run_code transport with injected arguments and tool templates.
  * Everything else (validation, presentation, live schema getters, output
@@ -274,7 +335,9 @@ export class RunCodeItselfExecutor extends PtcExecutor {
    */
   describe(tools) {
     const description = super.describe(tools)
-    const guide = this.promptMode === 'tool' ? renderCompactSdk(tools, { sdkStyle: 'index', fullDescriptions: true }) : ''
+    const toolGuide = this.promptMode === 'tool'
+      ? '\n\n' + renderToolList(tools, { fullDescriptions: true }) + '\n\n' + renderUsageRules()
+      : ''
     return {
       ...description,
       schemas: description.schemas.map(schema => {
@@ -287,7 +350,7 @@ export class RunCodeItselfExecutor extends PtcExecutor {
           : schema.description
         return {
           ...schema,
-          description: base + TOOL_NOTE + (guide === '' ? '' : '\n\n' + guide),
+          description: base + (toolGuide === '' ? TOOL_NOTE : toolGuide),
           parameters: {
             ...parameters,
             additionalProperties: true,
