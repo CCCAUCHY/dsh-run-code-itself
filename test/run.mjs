@@ -119,6 +119,8 @@ const webDefinition = { name: 'web_search', description: 'Search the web. Return
   assert.ok(guide.includes('Other tools:'))
   assert.ok(guide.includes('web_search()'))
   assert.ok(guide.includes('Search the web.'))
+  assert.ok(guide.includes('run_code_itself.errPrefix'))
+  assert.ok(guide.includes('"errPrefix":"\\nERR:"'))
   assert.ok(guide.includes('"code":"const args = run_code_subtools.bash.template'))
   assert.ok(guide.includes('"label":"List files"'))
   assert.ok(guide.includes('"command":"ls -la"'))
