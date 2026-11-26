@@ -14,6 +14,9 @@ export const name = 'run-code-itself'
 /** Host services used by the executor and per-agent installation. */
 export const inject = ['tools', 'systemPrompt', 'ptcRuntime', 'agents']
 
+/** Default tools shown in the common section. */
+export const DEFAULT_COMMON_TOOLS = ['bash', 'read', 'write', 'edit', 'glob', 'grep', 'read_image']
+
 /** Plugin configuration. Deprecated prompt fields are accepted but ignored. */
 export const Config = z.object({
   maxSubCallsPerMinute: z.natural().min(1).description(
@@ -24,6 +27,9 @@ export const Config = z.object({
   ),
   promptMode: z.string().default('system').description('Deprecated and ignored; the guide always lives in the system prompt.'),
   sdkStyle: z.string().default('rules').description('Deprecated and ignored; no PTC SDK declarations are rendered.'),
+  commonTools: z.array(z.string()).default(DEFAULT_COMMON_TOOLS).description(
+    'Tool names shown in the common section. Every other visible tool still appears in the compact directory.',
+  ),
 })
 
 /** Model-facing tool name. Deliberately not run_code. */
@@ -31,9 +37,6 @@ export const PROGRAM_TOOL = 'run_code'
 /** Program-visible preset variables. */
 export const PROGRAM_ITSELF = 'run_code_itself'
 export const PROGRAM_SUBTOOLS = 'run_code_subtools'
-/** Tools whose compact signatures stay in the system guide. */
-const COMMON_TOOLS = new Set(['bash', 'read', 'write', 'edit', 'glob', 'grep', 'read_image'])
-
 /** Tool description: deliberately short; the rules live in the system prompt. */
 const TOOL_DESCRIPTION = 'Run one program against the available tools. code is the body of an async TypeScript function; top-level await and return work, and erasable syntax only is allowed. Put data and every subtool argument in sibling fields of this call; the complete arguments are run_code_itself and the per-tool metadata is run_code_subtools. Never write tools.x({...}) inside code. Follow the Data-Code Separation rules in the system prompt. Only printed or returned output is model-visible; image results attach after the run; nested tools keep their own policies.'
 
@@ -117,9 +120,10 @@ function signatureFor(definition) {
 }
 
 /** The complete system-prompt guide. Deliberately longer than the tool description. */
-export function renderProgramGuide(tools) {
-  const common = tools.filter(tool => COMMON_TOOLS.has(tool.name))
-  const other = tools.filter(tool => !COMMON_TOOLS.has(tool.name))
+export function renderProgramGuide(tools, commonTools = DEFAULT_COMMON_TOOLS) {
+  const commonSet = new Set(Array.isArray(commonTools) ? commonTools : DEFAULT_COMMON_TOOLS)
+  const common = tools.filter(tool => commonSet.has(tool.name))
+  const other = tools.filter(tool => !commonSet.has(tool.name))
   const lines = [
     '## Data-Code Separation',
     '',
@@ -172,7 +176,7 @@ export class RunCodeItselfExecutor extends PtcExecutor {
   #transport
 
   constructor(ctx, config) {
-    const { maxSubCallsPerMinute, maxParallelSubCalls } = config ?? {}
+    const { maxSubCallsPerMinute, maxParallelSubCalls, commonTools } = config ?? {}
     super(ctx, {
       ...(maxSubCallsPerMinute === undefined ? {} : { maxSubCallsPerMinute }),
       ...(maxParallelSubCalls === undefined ? {} : { maxParallelSubCalls }),
@@ -181,7 +185,7 @@ export class RunCodeItselfExecutor extends PtcExecutor {
       name: 'tools:run_code',
       order: ctx.systemPrompt.getSectionOrder('TOOLS_SDK'),
       interpolate: false,
-      text: tools => renderProgramGuide(tools),
+      text: tools => renderProgramGuide(tools, commonTools),
     }]
   }
 
@@ -265,8 +269,10 @@ function executorConfig(settings, inherited) {
   const config = {}
   const maxSubCalls = settings.maxSubCallsPerMinute ?? inherited.maxSubCallsPerMinute
   const maxParallel = settings.maxParallelSubCalls ?? inherited.maxParallelSubCalls
+  const commonTools = settings.commonTools ?? inherited.commonTools
   if (maxSubCalls !== undefined) config.maxSubCallsPerMinute = maxSubCalls
   if (maxParallel !== undefined) config.maxParallelSubCalls = maxParallel
+  if (Array.isArray(commonTools)) config.commonTools = commonTools
   return config
 }
 

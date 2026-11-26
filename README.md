@@ -65,7 +65,20 @@ Host row:
 
 - maxSubCallsPerMinute: nested tool-call attempts per minute of run_code timeout.
 - maxParallelSubCalls: maximum overlapping concurrency-safe program subcalls.
+- commonTools: tool names shown in the common section; all other visible tools still appear in the compact directory. Default: bash, read, write, edit, glob, grep, read_image.
 - promptMode and sdkStyle: deprecated, accepted for compatibility, ignored.
+
+Example profile config:
+
+    config:
+      commonTools:
+        - bash
+        - read
+        - write
+        - edit
+        - glob
+        - grep
+        - read_image
 
 ## Why the tool name is still run_code
 

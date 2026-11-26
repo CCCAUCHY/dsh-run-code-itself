@@ -65,7 +65,20 @@ Host 行：
 
 - maxSubCallsPerMinute：run_code 超时内每分钟的嵌套调用尝试数。
 - maxParallelSubCalls：并发安全的子调用上限。
+- commonTools：显示在常用工具段的工具名；其他可见工具仍会列在紧凑目录里。默认：bash、read、write、edit、glob、grep、read_image。
 - promptMode / sdkStyle：已废弃，仅为兼容保留，忽略。
+
+profile 配置示例：
+
+    config:
+      commonTools:
+        - bash
+        - read
+        - write
+        - edit
+        - glob
+        - grep
+        - read_image
 
 ## 为什么工具名仍然是 run_code
 
