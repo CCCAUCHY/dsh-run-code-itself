@@ -359,6 +359,7 @@ export class RunCodeItselfExecutor extends PtcExecutor {
         const code = isObjectRecord(properties.code) ? properties.code : undefined
         const base = this.promptMode === 'tool'
           ? schema.description.replace('per the declarations in the system prompt', 'using the tool list and rules in this description')
+            + '\n\nTo use a tool template: const args = run_code_subtools.<tool>.template; fill args from run_code_itself; return await tools.<tool>(args). Never write tools.<tool>({...}) inline. Print run_code_subtools.<tool> only to inspect the template, not as a substitute for calling tools.<tool>.'
           : schema.description
         return {
           ...schema,
