@@ -20,12 +20,9 @@ DSH PTC 的 Data-Code Separation 插件。
 
     {"code":"return await tools.write(run_code_itself.write)","description":"写 SVG","write":{"file_path":"out.svg","content":"<svg>...</svg>"}}
 
-或者使用模板：
+或者把模板写成一次完整调用：
 
-    const args = run_code_subtools.write.template
-    args.file_path = run_code_itself.write.file_path
-    args.content = run_code_itself.write.content
-    return await tools.write(args)
+    {"code":"const args = run_code_subtools.bash.template; args.description = run_code_itself.label; args.command = run_code_itself.command; return await tools.bash(args)","description":"列文件","label":"列文件","command":"ls -la"}
 
 run_code_subtools 是普通 JSON；所有可见工具都在里面，包括没有列在提示词里的工具。可以用 Object.keys(run_code_subtools) 或打印某个条目。
 

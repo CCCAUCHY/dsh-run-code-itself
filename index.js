@@ -119,6 +119,8 @@ function signatureFor(definition) {
 /** The complete system-prompt guide. Deliberately longer than the tool description. */
 export function renderProgramGuide(tools) {
   const common = tools.filter(tool => COMMON_TOOLS.has(tool.name))
+  const other = tools.filter(tool => !COMMON_TOOLS.has(tool.name))
+  const hiddenLabel = other.length === 1 ? '1 other tool' : other.length + ' other tools'
   const lines = [
     '## Data-Code Separation',
     '',
@@ -140,10 +142,7 @@ export function renderProgramGuide(tools) {
     '{"code":"return await tools.bash(run_code_itself.bash)","description":"List files","bash":{"description":"List files","command":"ls -la"}}',
     '',
     'Template (sibling fields are arbitrary; this example uses label and command):',
-    'const args = run_code_subtools.bash.template',
-    'args.description = run_code_itself.label',
-    'args.command = run_code_itself.command',
-    'return await tools.bash(args)',
+    '{"code":"const args = run_code_subtools.bash.template; args.description = run_code_itself.label; args.command = run_code_itself.command; return await tools.bash(args)","description":"List files","label":"List files","command":"ls -la"}',
     '',
     'Never write tools.bash({...}) or tools.x({...}) inside code.',
     '',
@@ -159,7 +158,7 @@ export function renderProgramGuide(tools) {
     '',
     '## Hidden tools',
     '',
-    'All other tools are available in run_code_subtools. Inspect it with Object.keys(run_code_subtools) or print a named entry.',
+    'All other tools are available in run_code_subtools. There are ' + hiddenLabel + '; do not print the whole list, inspect a named entry when needed.',
   )
   return lines.join('\n')
 }

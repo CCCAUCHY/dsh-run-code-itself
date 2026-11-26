@@ -20,12 +20,9 @@ write this:
 
     {"code":"return await tools.write(run_code_itself.write)","description":"Write SVG","write":{"file_path":"out.svg","content":"<svg>...</svg>"}}
 
-or use the template:
+or use the template as a complete call:
 
-    const args = run_code_subtools.write.template
-    args.file_path = run_code_itself.write.file_path
-    args.content = run_code_itself.write.content
-    return await tools.write(args)
+    {"code":"const args = run_code_subtools.bash.template; args.description = run_code_itself.label; args.command = run_code_itself.command; return await tools.bash(args)","description":"List files","label":"List files","command":"ls -la"}
 
 run_code_subtools is a plain JSON object. All visible tools are there, including tools not listed in the prompt; inspect it with Object.keys(run_code_subtools) or print a named entry.
 
