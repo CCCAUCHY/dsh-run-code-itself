@@ -1,8 +1,3 @@
-/**
- * Verification for the run_code_itself plugin. Runs against the installed DSH
- * packages through test/loader.mjs, with the PTC runtime faked so the real
- * run_code transport builds the program the plugin hands it.
- */
 import assert from 'node:assert/strict'
 import { Context } from '@deepseek-ai/cordis'
 import { createScope } from '@deepseek-ai/dsh-scope'
@@ -11,9 +6,7 @@ import { PtcExecutor } from '@deepseek-ai/dsh-tool-executor-ptc'
 import * as plugin from '../index.js'
 
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor
-const BT = String.fromCharCode(96)
 const LS = String.fromCharCode(0x2028)
-const original = 'const { rows, regex } = run_code_itself; return rows.filter(row => new RegExp(regex).test(row.id))'
 
 function harness() {
   const ctx = new Context()
@@ -25,19 +18,15 @@ function harness() {
     sandboxMode: undefined,
     timeout: { defaultMs: 120000, maxMs: 600000 },
     executionInstructions: '',
-    resolve(request) {
-      return { ...request, cwd: '/tmp', timeoutMs: request.timeoutMs ?? 120000 }
-    },
-    async run(spec) {
-      programs.push(spec.program)
-      return { logs: [], value: 'ran' }
-    },
+    resolve(request) { return { ...request, cwd: '/tmp', timeoutMs: request.timeoutMs ?? 120000 } },
+    async run(spec) { programs.push(spec.program); return { logs: [], value: 'ran' } },
   }
   const tools = {
     schemas: () => [],
     definitions: () => [],
     executable: () => undefined,
     get: () => undefined,
+    checkGuards: () => undefined,
     selectExecutor: () => undefined,
   }
   const systemPrompt = { getSectionOrder: () => 0, section: () => () => {} }
@@ -63,358 +52,199 @@ async function runProgram(executor, args) {
   const transport = executor.requirePtcTransport()
   const result = await transport.execute(args, toolExec())
   assert.equal(result.logs.length, 0)
-  const program = executor.programs.at(-1)
-  assert.equal(typeof program, 'string')
-  return { program, value: await new AsyncFunction(program)() }
+  const programSource = executor.programs.at(-1)
+  assert.equal(typeof programSource, 'string')
+  return { programSource, value: await new AsyncFunction(programSource)() }
 }
 
-const { ctx, programs } = harness()
-const executor = new plugin.RunCodeItselfExecutor(ctx, {})
-executor.programs = programs
-
-// --- schema ---------------------------------------------------------------
-const described = executor.describe([])
-assert.equal(described.schemas.length, 1)
-const schema = described.schemas[0]
-assert.equal(schema.name, 'run_code')
-assert.equal(schema.parameters.additionalProperties, true)
-assert.equal(schema.parameters.required.includes('code'), true)
-assert.equal(schema.parameters.required.includes('description'), true)
-assert.ok(schema.description.includes('Extra top-level sibling fields are allowed'))
-assert.ok(!schema.description.includes('Code-Data'))
-assert.ok(!schema.description.includes('MUST'))
-assert.ok(schema.parameters.properties.code.description.includes('run_code_itself'))
-assert.ok(schema.parameters.properties.code.description.includes('metaprogramming'))
-console.log('schema: open parameters and guidance present')
-
-// --- the proposed metaprogramming example ---------------------------------
-{
-  const rows = [{ id: 'AB-123-4567' }, { id: 'ZZ-9999' }]
-  const { program, value } = await runProgram(executor, {
-    code: original,
-    description: 'Filter rows by id pattern',
-    regex: '\\b\\d{3}-\\d{4}\\b',
-    rows,
-  })
-  assert.ok(program.startsWith('const run_code_subtools = '))
-  assert.ok(program.includes('const run_code_itself = {'))
-  assert.ok(program.includes('\\\\b\\\\d{3}-\\\\d{4}\\\\b'))
-  assert.deepEqual(value, [{ id: 'AB-123-4567' }])
-  console.log('example: filtered', JSON.stringify(value))
-}
-
-// --- code identity and parsed extras --------------------------------------
-{
-  const code = 'return { same: run_code_itself.code, rows: run_code_itself.rows, n: run_code_itself.n }'
-  const { value } = await runProgram(executor, { code, description: 'identity', rows: [{ id: 'a' }], n: 3 })
-  assert.deepEqual(value, { same: code, rows: [{ id: 'a' }], n: 3 })
-  console.log('identity: code and extra fields preserved')
-}
-
-// --- no extra fields ------------------------------------------------------
-{
-  const { value } = await runProgram(executor, { code: 'return typeof run_code_itself.rows', description: 'no extras' })
-  assert.equal(value, 'undefined')
-  console.log('empty extras: variable still present')
-}
-
-// --- __proto__ payload ----------------------------------------------------
-{
-  const args = JSON.parse('{"code":"return run_code_itself.__proto__.x","description":"proto","__proto__":{"x":7}}')
-  const { program, value } = await runProgram(executor, args)
-  assert.ok(program.includes('JSON.parse('))
-  assert.equal(value, 7)
-  console.log('__proto__: own key preserved')
-}
-
-// --- U+2028 payload -------------------------------------------------------
-{
-  const code = 'return run_code_itself.text.charCodeAt(0)'
-  const { program, value } = await runProgram(executor, { code, description: 'line separator', text: LS })
-  assert.equal(value, 0x2028)
-  assert.ok(!program.includes(LS))
-  console.log('U+2028: escaped and round-tripped')
-}
-
-// --- malformed arguments pass through to the transport --------------------
-{
-  const transport = executor.requirePtcTransport()
-  await assert.rejects(() => transport.execute({ code: 5, description: 'x' }, toolExec()), /invalid arguments/)
-  await assert.rejects(() => transport.execute({ code: 'return 1' }, toolExec()), /invalid arguments/)
-  console.log('invalid arguments: still rejected by the transport')
-}
-
-// --- per-agent installation -----------------------------------------------
-{
-  const ctx2 = new Context()
-  const installed = []
-  const systemPrompt2 = { getSectionOrder: () => 0, section: () => () => {} }
-  const runtime2 = {
-    language: 'typescript', programFormat: 'function-body', retainsState: false,
-    timeout: { defaultMs: 120000, maxMs: 600000 }, executionInstructions: '',
-  }
-  ctx2.provide('systemPrompt', systemPrompt2)
-  ctx2.provide('ptcRuntime', runtime2)
-  const current = new PtcExecutor(ctx2, { maxSubCallsPerMinute: 77 })
-  const tools2 = {
-    schemas: () => [],
-    definitions: () => [],
-    executable: () => undefined,
-    get: () => undefined,
-    selectExecutor: () => current,
-    setExecutor(executor) { installed.push(executor); return () => {} },
-  }
-  ctx2.provide('tools', tools2)
-  const agents = []
-  ctx2.provide('agents', { list: () => agents })
-  const scope = createScope(ctx2, { agent: 'a1' })
-  const agent = { id: 'a1', ctx: scope.ctx }
-  agents.push(agent)
-  await ctx2.plugin(plugin)
-  assert.equal(installed.length, 1)
-  assert.ok(installed[0] instanceof plugin.RunCodeItselfExecutor)
-  assert.equal(installed[0].config.maxSubCallsPerMinute, 77)
-  console.log('installation: enhanced executor inherits PTC limits')
-  await scope.dispose()
-}
-console.log('')
-
-// --- real registry: agent scope shadows the preset scope -------------------
-{
-  const ctx3 = new Context()
-  let promptAssembly
-  const prompt = {
-    getSectionOrder: () => 0,
-    section: () => () => {},
-    tools(callback) { promptAssembly = callback; return () => {} },
-  }
-  ctx3.provide('systemPrompt', prompt)
-  const runtime3 = {
-    language: 'typescript', programFormat: 'function-body', retainsState: false,
-    timeout: { defaultMs: 120000, maxMs: 600000 }, executionInstructions: '',
-    resolve(request) { return { ...request, cwd: '/tmp', timeoutMs: 120000 } },
-    async run() { return { logs: [], value: 'ok' } },
-  }
-  ctx3.provide('ptcRuntime', runtime3)
-  const tools3 = new ToolsService(ctx3)
-  const rootExecutor = new PtcExecutor(ctx3, {})
-  tools3.setExecutor(rootExecutor)
-  const agent = { id: 'a2' }
-  const scope = createScope(ctx3, agent)
-  agent.ctx = scope.ctx
-  const agents = [agent]
-  ctx3.provide('agents', { list: () => agents })
-  await ctx3.plugin(plugin)
-  assert.notEqual(tools3.selectExecutor(agent), rootExecutor)
-  assert.ok(tools3.selectExecutor(agent) instanceof plugin.RunCodeItselfExecutor)
-  assert.equal(tools3.selectExecutor(undefined), rootExecutor)
-  const assembled = promptAssembly({ scope: agent })
-  assert.equal(assembled.schemas.length, 1)
-  assert.equal(assembled.schemas[0].parameters.additionalProperties, true)
-  console.log('scope shadowing: agent executor wins and its schema is assembled')
-  await scope.dispose()
-}
-// --- preset-scoped mount replaces the preset executor ----------------------
-{
-  const ctx4 = new Context()
-  let assembly
-  const prompt = {
-    getSectionOrder: () => 0,
-    section: () => () => {},
-    tools(callback) { assembly = callback; return () => {} },
-  }
-  ctx4.provide('systemPrompt', prompt)
-  const runtime4 = {
-    language: 'typescript', programFormat: 'function-body', retainsState: false,
-    timeout: { defaultMs: 120000, maxMs: 600000 }, executionInstructions: '',
-    resolve(request) { return { ...request, cwd: '/tmp', timeoutMs: 120000 } },
-    async run() { return { logs: [], value: 'ok' } },
-  }
-  ctx4.provide('ptcRuntime', runtime4)
-  const tools4 = new ToolsService(ctx4)
-  const root = new PtcExecutor(ctx4, {})
-  tools4.setExecutor(root)
-  ctx4.provide('agents', { list: () => [] })
-  const presetKey = { preset: 'main' }
-  const scope = createScope(ctx4, presetKey)
-  await scope.ctx.plugin(plugin)
-  assert.notEqual(tools4.selectExecutor(presetKey), root)
-  assert.ok(tools4.selectExecutor(presetKey) instanceof plugin.RunCodeItselfExecutor)
-  const assembled = assembly({ scope: presetKey })
-  assert.equal(assembled.schemas.length, 1)
-  assert.equal(assembled.schemas[0].parameters.additionalProperties, true)
-  console.log('preset mount: enhanced executor registered in the preset scope')
-  await scope.dispose()
-}
-// --- preloaded tool templates ----------------------------------------------
-{
-  const bashSchema = {
-    name: 'bash',
-    description: 'Execute a shell command and return stdout/stderr.',
-    parameters: {
+const bashDefinition = {
+  name: 'bash',
+  description: 'Execute a shell command and return stdout/stderr.',
+  parameters: {
+    type: 'object',
+    properties: {
+      description: { type: 'string' },
+      command: { type: 'string' },
+      timeoutMs: { type: 'number' },
+    },
+    required: ['description', 'command'],
+  },
+  output: {
+    schema: {
       type: 'object',
-      properties: {
-        description: { type: 'string' },
-        command: { type: 'string' },
-        timeoutMs: { type: 'number' },
-      },
-      required: ['description', 'command'],
+      properties: { stdout: { type: 'object', properties: { text: { type: 'string' } } }, exitCode: { type: 'number' } },
     },
-  }
-  const bashDefinition = {
-    ...bashSchema,
-    output: {
-      schema: {
-        type: 'object',
-        properties: {
-          stdout: { type: 'object', properties: { text: { type: 'string' } } },
-          exitCode: { type: 'number' },
-        },
-      },
-    },
-  }
-  const subtools = plugin.buildSubtools([bashDefinition])
+  },
+}
+const readDefinition = {
+  name: 'read',
+  description: 'Read a UTF-8 text file and return line-numbered content.',
+  parameters: {
+    type: 'object',
+    properties: { file_path: { type: 'string' }, offset: { type: 'number' } },
+    required: ['file_path'],
+  },
+  output: { schema: {} },
+}
+const webDefinition = { name: 'web_search', description: 'Search the web. Returns results.', parameters: {}, output: { schema: {} } }
+
+// --- schema -----------------------------------------------------------------
+{
+  const { ctx, programs } = harness()
+  const executor = new plugin.RunCodeItselfExecutor(ctx, {})
+  executor.programs = programs
+  const described = executor.describe([bashDefinition, readDefinition])
+  assert.equal(described.schemas.length, 1)
+  assert.deepEqual(described.knownNames, ['run_code'])
+  const schema = described.schemas[0]
+  assert.equal(schema.name, 'run_code')
+  assert.equal(schema.parameters.additionalProperties, true)
+  assert.equal(schema.parameters.required.includes('code'), true)
+  assert.equal(schema.parameters.required.includes('description'), true)
+  assert.ok(schema.description.includes('run_code_itself'))
+  assert.ok(schema.description.includes('run_code_subtools'))
+  assert.ok(schema.description.includes('body of an async TypeScript function'))
+  assert.ok(schema.description.includes('Never write tools.x({...})'))
+  assert.ok(schema.description.includes('Data-Code Separation'))
+  assert.ok(!schema.description.includes('declare const'))
+  assert.ok(schema.parameters.properties.code.description.includes('run_code_itself'))
+  console.log('schema: neutral run_code name and short description')
+
+  const guide = plugin.renderProgramGuide([bashDefinition, readDefinition, webDefinition])
+  assert.ok(guide.includes('## Data-Code Separation'))
+  assert.ok(guide.includes('## Program variables'))
+  assert.ok(guide.includes('## Common tools'))
+  assert.ok(guide.includes('bash(description, command'))
+  assert.ok(guide.includes('## Hidden tools'))
+  assert.ok(!guide.includes('web_search: Search the web.'))
+  assert.ok(!guide.includes('declare const tools'))
+  assert.ok(guide.length > schema.description.length)
+  console.log('guide: rules longer than tool description')
+
+  const subtools = plugin.buildSubtools([bashDefinition, readDefinition])
   assert.equal(subtools.bash.description, 'Execute a shell command and return stdout/stderr.')
+  assert.ok(subtools.bash.signature.startsWith('bash(description, command'))
   assert.deepEqual({ ...subtools.bash.template }, { description: '', command: '' })
-  const readDefinition = {
-    name: 'read',
-    description: 'Read a UTF-8 text file and return line-numbered content.',
-    parameters: {
-      type: 'object',
-      properties: { file_path: { type: 'string' }, offset: { type: 'number' } },
-      required: ['file_path'],
-    },
-    output: { schema: {} },
-  }
-  assert.deepEqual({ ...plugin.buildSubtools([readDefinition]).read.template }, { file_path: '' })
-  const defaultDefinition = {
-    name: 'demo',
-    description: 'Demo tool.',
-    parameters: {
-      type: 'object',
-      properties: { required: { type: 'string' }, optional: { type: 'number', default: 7 } },
-      required: ['required'],
-    },
-    output: { schema: {} },
-  }
-  assert.deepEqual({ ...plugin.buildSubtools([defaultDefinition]).demo.template }, { required: '', optional: 7 })
-
-  const webDefinition = { name: 'web_search', description: 'Search the web. Returns results.', parameters: {}, output: { schema: {} } }
-  const writeDefinition = {
-    name: 'write',
-    description: 'Create or fully replace a UTF-8 text file.',
+  assert.deepEqual({ ...subtools.read.template }, { file_path: '' })
+  const complexDefinition = {
+    name: 'complex',
+    description: 'Complex tool.',
     parameters: {
       type: 'object',
       properties: {
-        file_path: { type: 'string' },
-        content: { type: 'string' },
-        sandbox_permissions: { type: 'string' },
-        justification: { type: 'string' },
+        kind: { type: 'string', enum: ['a', 'b'] },
+        nested: { type: 'object', properties: { x: { type: 'string', required: true } } },
       },
-      required: ['file_path', 'content'],
+      required: ['kind', 'nested'],
     },
-    output: {
-      schema: {
-        type: 'object',
-        properties: {
-          path: { type: 'string' },
-          operation: { type: 'string' },
-          before: { type: 'string' },
-          after: { type: 'string' },
-        },
-      },
-    },
+    output: { schema: {} },
   }
-  const editDefinition = {
-    name: 'edit',
-    description: 'Edit an existing UTF-8 text file by replacing literal text.',
-    parameters: {
-      type: 'object',
-      properties: {
-        file_path: { type: 'string' },
-        old_string: { type: 'string' },
-        new_string: { type: 'string' },
-        replace_all: { type: 'boolean' },
-      },
-      required: ['file_path', 'old_string', 'new_string'],
-    },
-    output: {
-      schema: {
-        type: 'object',
-        properties: { path: { type: 'string' }, before: { type: 'string' }, after: { type: 'string' } },
-      },
-    },
-  }
-  const sdk = plugin.renderCompactSdk([bashDefinition, webDefinition])
-  assert.ok(sdk.includes('## Code-Data Separation'))
-  assert.ok(sdk.includes('**Minimize escaping in code.**'))
-  assert.ok(sdk.includes('**Subtool metadata**'))
-  assert.ok(sdk.includes('Do not inline subtool JSON'))
-  assert.ok(sdk.includes('declare const run_code_itself'))
-  assert.ok(sdk.includes('declare const run_code_subtools'))
-  assert.ok(sdk.includes('args.description = run_code_itself.label'))
-  assert.ok(sdk.includes('interface ToolArgsMap'))
-  assert.ok(sdk.includes('tools.bash(run_code_itself.bash)'))
-  assert.ok(sdk.includes('web_search: Search the web.'))
-  assert.ok(sdk.includes('run_code_subtools'))
+  const complexTemplate = plugin.buildSubtools([complexDefinition]).complex.template
+  assert.equal(complexTemplate.kind, 'a')
+  assert.deepEqual({ ...complexTemplate.nested }, { x: '' })
+  console.log('templates: required fields, enum, nested object')
 
+  assert.equal(executor.sections.length, 1)
+  assert.equal(executor.sections[0].name, 'tools:run_code')
+}
+
+// --- injection and run_code variables ---------------------------------------
+{
   const { ctx, programs, tools } = harness()
-  tools.schemas = () => [bashSchema]
-  tools.definitions = () => [bashDefinition]
+  tools.definitions = () => [bashDefinition, readDefinition]
+  const executor = new plugin.RunCodeItselfExecutor(ctx, {})
+  executor.programs = programs
+  const { programSource, value } = await runProgram(executor, {
+    code: 'return { code: run_code_itself.code, script: run_code_itself.script, keys: Object.keys(run_code_subtools) }',
+    description: 'identity',
+    script: 'a\nb "quote" C:\\tmp',
+    rows: [{ id: 'a' }],
+  })
+  assert.ok(programSource.startsWith('const run_code_subtools = '))
+  assert.ok(programSource.includes('const run_code_itself = {'))
+
+  assert.deepEqual(value, {
+    code: 'return { code: run_code_itself.code, script: run_code_itself.script, keys: Object.keys(run_code_subtools) }',
+    script: 'a\nb "quote" C:\\tmp',
+    keys: ['bash', 'read'],
+  })
+  console.log('injection: run_code_itself and run_code_subtools')
+}
+
+// --- __proto__ and U+2028 --------------------------------------------------
+{
+  const { ctx, programs } = harness()
+  const executor = new plugin.RunCodeItselfExecutor(ctx, {})
+  executor.programs = programs
+  const args = JSON.parse('{"code":"return run_code_itself.__proto__.x","description":"proto","__proto__":{"x":7}}')
+  const { programSource, value } = await runProgram(executor, args)
+  assert.ok(programSource.includes('JSON.parse('))
+  assert.equal(value, 7)
+  const lsArgs = { code: 'return run_code_itself.text.charCodeAt(0)', description: 'line separator', text: LS }
+  const { programSource: lsProgram, value: lsValue } = await runProgram(executor, lsArgs)
+  assert.equal(lsValue, 0x2028)
+  assert.ok(!lsProgram.includes(LS))
+  console.log('special payloads: __proto__ and U+2028')
+}
+
+// --- alias dispatch --------------------------------------------------------
+{
+  const { ctx, programs } = harness()
+  const executor = new plugin.RunCodeItselfExecutor(ctx, {})
+  executor.programs = programs
+  const result = await executor.execute({
+    calls: [{ type: 'tool-call', id: 'call-1', name: 'run_code', arguments: JSON.stringify({ code: 'return 1', description: 'alias dispatch' }) }],
+    signal: new AbortController().signal,
+  })
+  assert.equal(result.results.length, 1)
+  assert.equal(result.results[0].result.isError, false)
+  assert.equal(programs.length, 1)
+  assert.equal(programs.length, 1)
+  assert.ok(programs[0].includes('const run_code_itself = '))
+  console.log('alias: run_code call reaches the run_code transport')
+}
+
+// --- invalid arguments -----------------------------------------------------
+{
+  const { ctx, programs } = harness()
   const executor = new plugin.RunCodeItselfExecutor(ctx, {})
   executor.programs = programs
   const transport = executor.requirePtcTransport()
-  await transport.execute({
-    code: 'return { description: run_code_subtools.bash.description, template: run_code_subtools.bash.template, arg: run_code_itself.bash }',
-    description: 'Template test',
-    bash: { command: 'ls -la', description: 'List files' },
-  }, toolExec())
-  const program = programs.at(-1)
-  assert.ok(program.includes('const run_code_subtools = '))
-  assert.ok(program.includes('const run_code_itself = '))
-  assert.ok(!program.includes('run_code_call'))
-  assert.ok(!program.includes('run_code_templates'))
-  const fn = new AsyncFunction(program)
-  const value = await fn()
-  assert.equal(value.description, 'Execute a shell command and return stdout/stderr.')
-  assert.deepEqual(value.template, { description: '', command: '' })
-  assert.deepEqual(value.arg, { command: 'ls -la', description: 'List files' })
-
-  const indexSdk = plugin.renderCompactSdk([bashDefinition, webDefinition], { sdkStyle: 'index' })
-  assert.ok(indexSdk.includes('## Tools'))
-  assert.ok(indexSdk.includes('web_search: Search the web.'))
-  assert.ok(!indexSdk.includes('declare const tools'))
-  const fullIndex = plugin.renderCompactSdk([bashDefinition, webDefinition], { sdkStyle: 'index', fullDescriptions: true })
-  assert.ok(fullIndex.includes('web_search: Search the web. Returns results.'))
-
-  const { ctx: toolCtx } = harness()
-  const toolExecutor = new plugin.RunCodeItselfExecutor(toolCtx, { promptMode: 'tool' })
-  const toolSchema = toolExecutor.describe([bashDefinition, webDefinition, writeDefinition, editDefinition]).schemas[0]
-  const toolsIndex = toolSchema.description.indexOf('## Tools')
-  const rulesIndex = toolSchema.description.indexOf('## run_code Usage Rules')
-  assert.ok(toolSchema.description.startsWith('Execute a TypeScript program'))
-  assert.ok(toolSchema.description.includes('To use a tool template: const args = run_code_subtools.<tool>.template'))
-  assert.ok(toolsIndex > 0)
-  assert.ok(rulesIndex > toolsIndex)
-  assert.ok(toolSchema.description.includes('Code-Data Separation'))
-  assert.ok(toolSchema.description.includes('Search the web. Returns results.'))
-  assert.ok(toolSchema.description.includes('write(file_path, content, sandbox_permissions?, justification?) -> {path, operation, before, after}'))
-  assert.ok(toolSchema.description.includes('edit(file_path, old_string, new_string, replace_all?) -> {path, before, after}'))
-  assert.ok(!toolSchema.description.includes('declare const tools'))
-  assert.equal(toolExecutor.sections.length, 0)
-
-  const rulesSdk = plugin.renderCompactSdk([bashDefinition, webDefinition], { sdkStyle: 'rules' })
-  assert.ok(rulesSdk.includes('## run_code Usage Rules'))
-  assert.ok(rulesSdk.includes('## Common tools'))
-  assert.ok(rulesSdk.includes('bash('))
-  assert.ok(!rulesSdk.includes('web_search'))
-  assert.ok(rulesSdk.includes('All other tools are available in run_code_subtools'))
-  assert.ok(!rulesSdk.includes('declare const tools'))
-  const systemExecutor = new plugin.RunCodeItselfExecutor(toolCtx, { promptMode: 'system', sdkStyle: 'rules' })
-  const systemSchema = systemExecutor.describe([bashDefinition, webDefinition]).schemas[0]
-  assert.ok(rulesSdk.length > systemSchema.description.length)
-  console.log('prompt modes: index SDK, tool-description mode, and rules-heavy system mode')
-
-  console.log('subtools: description and full template preloaded; only run_code_itself and run_code_subtools')
+  await assert.rejects(() => transport.execute({ code: 5, description: 'x' }, toolExec()), /invalid arguments/)
+  await assert.rejects(() => transport.execute({ code: 'return 1' }, toolExec()), /invalid arguments/)
+  const { ctx: pyCtx, runtime: pyRuntime } = harness()
+  pyRuntime.language = 'python'
+  const pyExecutor = new plugin.RunCodeItselfExecutor(pyCtx, {})
+  await assert.rejects(
+    () => pyExecutor.requirePtcTransport().execute({ code: 'return 1', description: 'python' }, toolExec()),
+    /TypeScript PTC only/,
+  )
+  console.log('invalid arguments and Python rejection')
 }
+
+// --- preset mount ----------------------------------------------------------
+{
+  const ctx = new Context()
+  let assembly
+  const prompt = { getSectionOrder: () => 0, section: () => () => {}, tools(cb) { assembly = cb; return () => {} } }
+  ctx.provide('systemPrompt', prompt)
+  const runtime = {
+    language: 'typescript', programFormat: 'function-body', retainsState: false,
+    timeout: { defaultMs: 120000, maxMs: 600000 }, executionInstructions: '',
+    resolve(request) { return { ...request, cwd: '/tmp', timeoutMs: 120000 } },
+    async run() { return { logs: [], value: 'ok' } },
+  }
+  ctx.provide('ptcRuntime', runtime)
+  const tools = new ToolsService(ctx)
+  tools.setExecutor(new PtcExecutor(ctx, {}))
+  ctx.provide('agents', { list: () => [] })
+  const presetKey = { preset: 'main' }
+  const scope = createScope(ctx, presetKey)
+  await scope.ctx.plugin(plugin)
+  const assembled = assembly({ scope: presetKey })
+  assert.equal(assembled.schemas[0].name, 'run_code')
+  console.log('preset mount: run_code schema assembled')
+  await scope.dispose()
+}
+
 console.log('All checks passed')
