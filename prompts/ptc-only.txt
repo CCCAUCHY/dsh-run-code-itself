@@ -1,1 +1,1 @@
-Only `run_code` may be called directly; a top-level call to any other tool is rejected. All other tools must be invoked from within the program.
+`run_code` is the only model-level tool call. Other tools are not model-level calls: pass their arguments through sibling fields of the `run_code` call and let the program invoke them.

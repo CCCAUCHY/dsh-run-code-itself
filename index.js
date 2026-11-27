@@ -29,7 +29,7 @@ export const Config = z.object({
   promptMode: z.string().default('system').description('Deprecated and ignored; the guide always lives in the system prompt.'),
   sdkStyle: z.string().default('rules').description('Deprecated and ignored; no PTC SDK declarations are rendered.'),
   commonTools: z.array(z.string()).default(DEFAULT_COMMON_TOOLS).description(
-    'Tool names shown in the common section. Every other visible tool still appears in the compact directory.',
+    'Tool names listed with compact signatures in the prompt. Every other visible tool appears by name.',
   ),
 })
 

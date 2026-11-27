@@ -148,8 +148,8 @@ const webDefinition = { name: 'web_search', description: 'Search the web. Return
 
   assert.equal(executor.sections.length, 2)
   assert.equal(executor.sections[0].name, 'tools:ptc-only')
+  assert.ok(executor.sections[0].text.includes('sibling fields'))
   assert.equal(executor.sections[1].name, 'tools:sdk')
-  assert.ok(executor.sections[0].text.includes('run_code'))
   const { ctx: configuredCtx } = harness()
   const configuredExecutor = new plugin.RunCodeItselfExecutor(configuredCtx, { commonTools: ['bash'] })
   const configuredGuide = configuredExecutor.sections[1].text([bashDefinition, readDefinition, webDefinition])
@@ -157,7 +157,7 @@ const webDefinition = { name: 'web_search', description: 'Search the web. Return
   assert.ok(configuredGuide.includes('- bash('))
   assert.ok(configuredGuide.includes('- read'))
   assert.ok(!configuredGuide.includes('declare const tools'))
-  console.log('sections: two rewritten PTC sections; common signatures and other names')
+  console.log('sections: fixed sibling ptc-only + compact sdk')
 }
 
 // --- injection and run_code variables ---------------------------------------
