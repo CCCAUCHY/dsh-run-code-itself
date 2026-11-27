@@ -1,7 +1,5 @@
 ## Program environment
 
-Only run_code is callable directly. A top-level call to any other tool is rejected; every other tool is reached from inside the program.
-
 The program receives bulk data through sibling fields of the run_code call and reads it from run_code_itself. Keep literals, JSON payloads, and escaping out of the program body; keep control flow in code.
 
 ## Runtime metadata
@@ -23,6 +21,10 @@ Common tools are declared by the typed SDK below. Other tools are listed by sign
 
 {{OTHER_TOOLS}}
 
+## Common tool SDK declarations
+
+{{SDK}}
+
 ## Examples
 
 Sibling field (small literal moved to a field; do not put a newline escape in code):
@@ -35,7 +37,3 @@ Array and loop:
 {"code":"const out = []; for (const e of run_code_itself.edits) out.push(await tools.edit(e)); return out.map(r => r.path)","description":"Apply edits","edits":[{"file_path":"a.ts","old_string":"old","new_string":"new"},{"file_path":"b.ts","old_string":"old2","new_string":"new2"}]}
 
 Never write tools.bash({...}) or tools.x({...}) inside code.
-
-## Common tool SDK declarations
-
-{{SDK}}
