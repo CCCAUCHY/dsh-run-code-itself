@@ -40,7 +40,7 @@ export const PROGRAM_ITSELF = 'run_code_itself'
 export const PROGRAM_SUBTOOLS = 'run_code_subtools'
 /** Fixed prompt data lives beside the code, not inside it. */
 const PTC_ONLY_TEXT = readFileSync(new URL('./prompts/ptc-only.txt', import.meta.url), 'utf8').trim()
-const TOOL_DESCRIPTION_TEMPLATE = readFileSync(new URL('./prompts/tool-description.txt', import.meta.url), 'utf8').trim()
+const TOOL_DESCRIPTION = readFileSync(new URL('./prompts/tool-description.txt', import.meta.url), 'utf8').trim()
 const GUIDE_TEMPLATE = readFileSync(new URL('./prompts/guide.md', import.meta.url), 'utf8').trim()
 
 /** True for a non-null non-array object. */
@@ -91,38 +91,38 @@ function signatureFor(definition) {
   return renderKey(definition.name) + '(' + args + ') -> ' + (outputProperties.length > 0 ? '{' + outputProperties.map(renderKey).join(', ') + '}' : 'JsonValue')
 }
 
-/** Rewritten equivalent of PTC's sandbox escalation guidance. */
-function sandboxGuidance(mode) {
-  return mode === undefined ? ''
-    : ' A wider sandbox approval covers this complete program run only. Nested tools keep their own policies. Request wider access only after a denial proves it is needed; earlier effects may remain, so inspect them before retrying. Programs are never replayed automatically.'
+/** First sentence of a tool description. */
+function firstSentence(text) {
+  const value = typeof text === 'string' ? text : ''
+  const index = value.indexOf('. ')
+  return index === -1 ? value : value.slice(0, index + 1)
 }
 
-/** Rewritten dynamic tool description; all runtime content is preserved. */
-function renderToolDescription(ctx) {
-  const runtime = ctx.get('ptcRuntime')
-  const instructions = typeof runtime?.executionInstructions === 'string' ? runtime.executionInstructions.trim() : ''
-  const values = {
-    PROGRAM_DESCRIPTION: 'the body of an async TypeScript function (erasable syntax only; top-level await and return work)',
-    EXECUTION_INSTRUCTIONS: instructions.length === 0 ? '' : ' ' + instructions,
-    SANDBOX_GUIDANCE: sandboxGuidance(runtime?.sandboxMode),
-  }
-  return TOOL_DESCRIPTION_TEMPLATE.replace(/\{\{(PROGRAM_DESCRIPTION|EXECUTION_INSTRUCTIONS|SANDBOX_GUIDANCE)\}\}/g, (_, key) => values[key])
+/** Collapse one-line JSDoc text. */
+function docText(text) {
+  return (typeof text === 'string' ? text : '').replace(/\*\//g, '* /').replace(/\s+/g, ' ').trim()
 }
 
-/** Other tools in the prompt: signature only. */
+/** Common tools in the prompt: compact signature and short description. */
+function renderCommonTools(tools) {
+  return tools.map(tool => '- ' + signatureFor(tool) + ': ' + firstSentence(docText(tool.description))).join('\n')
+}
+
+/** Other tools in the prompt: names only. */
 function renderOtherTools(tools) {
-  return tools.map(tool => '- ' + signatureFor(tool)).join('\n')
+  return tools.map(tool => '- ' + tool.name).join('\n')
 }
 
-/** Rewritten PTC section; common tool JSON, other tools compact. */
-export function renderProgramGuide(tools, commonTools = DEFAULT_COMMON_TOOLS, commonJson = '') {
+/** Compact rewritten PTC section: rules, common signatures, other names. */
+export function renderProgramGuide(tools, commonTools = DEFAULT_COMMON_TOOLS) {
   const commonSet = new Set(Array.isArray(commonTools) ? commonTools : DEFAULT_COMMON_TOOLS)
+  const common = tools.filter(tool => commonSet.has(tool.name))
   const other = tools.filter(tool => !commonSet.has(tool.name))
   const values = {
+    COMMON_TOOLS: renderCommonTools(common),
     OTHER_TOOLS: renderOtherTools(other),
-    COMMON_TOOLS_JSON: commonJson,
   }
-  return GUIDE_TEMPLATE.replace(/\{\{(OTHER_TOOLS|COMMON_TOOLS_JSON)\}\}/g, (_, key) => values[key])
+  return GUIDE_TEMPLATE.replace(/\{\{(COMMON_TOOLS|OTHER_TOOLS)\}\}/g, (_, key) => values[key])
 }
 
 /** The run_code transport with the run_code alias and injected variables. */
@@ -146,17 +146,10 @@ export class RunCodeItselfExecutor extends PtcExecutor {
       {
         name: 'tools:sdk',
         order: ctx.systemPrompt.getSectionOrder('TOOLS_SDK'),
-        text: tools => renderProgramGuide(tools, this.commonTools, this.#renderCommonJson(tools)),
+        text: tools => renderProgramGuide(tools, this.commonTools),
         interpolate: false,
       },
     ]
-  }
-
-  /** Generate common tool metadata as plain JSON, compatible with run_code_subtools. */
-  #renderCommonJson(tools) {
-    const commonSet = new Set(this.commonTools)
-    const common = tools.filter(tool => commonSet.has(tool.name))
-    return JSON.stringify(buildSubtools(common), null, 2)
   }
 
   /** Wrap the reserved transport once. */
@@ -187,7 +180,7 @@ export class RunCodeItselfExecutor extends PtcExecutor {
         return {
           ...schema,
           name: PROGRAM_TOOL,
-          description: renderToolDescription(this.ctx),
+          description: TOOL_DESCRIPTION,
           parameters: {
             ...parameters,
             additionalProperties: true,
