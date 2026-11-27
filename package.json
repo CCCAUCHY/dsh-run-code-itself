@@ -1,6 +1,6 @@
 {
   "name": "dsh-run-code-itself",
-  "version": "0.10.3",
+  "version": "0.10.4",
   "description": "Data-Code Separation for DSH PTC: preloads run_code_itself and run_code_subtools, with a rules-first system guide.",
   "type": "module",
   "license": "MIT",

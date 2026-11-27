@@ -118,7 +118,7 @@ const webDefinition = { name: 'web_search', description: 'Search the web. Return
   assert.ok(guide.includes('## Other tools'))
   assert.ok(guide.includes('## Common tool SDK declarations'))
   assert.ok(guide.includes('## Examples'))
-  assert.ok(guide.includes('Only run_code is callable directly'))
+  assert.ok(!guide.includes('Only run_code is callable directly'))
   assert.ok(guide.indexOf('## Common tool SDK declarations') < guide.indexOf('## Examples'))
   assert.ok(guide.includes('- read('))
   assert.ok(guide.includes('- web_search('))
@@ -163,17 +163,18 @@ const webDefinition = { name: 'web_search', description: 'Search the web. Return
   assert.deepEqual(Object.keys(subtools.read).sort(), ['description', 'output', 'parameters'])
   console.log('tool metadata: every entry has original description, parameters, and output')
 
-  assert.equal(executor.sections.length, 1)
-  assert.equal(executor.sections[0].name, 'tools:sdk')
-  assert.ok(executor.sections[0].text([bashDefinition, readDefinition, webDefinition]).includes('Only run_code'))
+  assert.equal(executor.sections.length, 2)
+  assert.equal(executor.sections[0].name, 'tools:ptc-only')
+  assert.equal(executor.sections[1].name, 'tools:sdk')
+  assert.ok(executor.sections[0].text.includes('run_code'))
   const { ctx: configuredCtx } = harness()
   const configuredExecutor = new plugin.RunCodeItselfExecutor(configuredCtx, { commonTools: ['bash'] })
-  const configuredGuide = configuredExecutor.sections[0].text([bashDefinition, readDefinition, webDefinition])
+  const configuredGuide = configuredExecutor.sections[1].text([bashDefinition, readDefinition, webDefinition])
   assert.ok(configuredGuide.includes('## Common tool SDK declarations'))
   assert.ok(configuredGuide.includes('declare const tools'))
   assert.ok(configuredGuide.includes('- read('))
   assert.ok(!configuredGuide.includes('### bash'))
-  console.log('sections: one rewritten sdk section; common SDK and other signatures')
+  console.log('sections: two rewritten PTC sections; common SDK and other signatures')
 }
 
 // --- injection and run_code variables ---------------------------------------
