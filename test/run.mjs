@@ -165,7 +165,8 @@ const webDefinition = { name: 'web_search', description: 'Search the web. Return
     script: 'a\nb "quote" C:\\tmp',
     rows: [{ id: 'a' }],
   })
-  assert.ok(programSource.startsWith('const run_code_subtools = '))
+  assert.ok(programSource.startsWith('return await (async () => {'))
+  assert.ok(programSource.includes('const run_code_subtools = '))
   assert.ok(programSource.includes('const run_code_itself = {'))
 
   assert.deepEqual(value, {
@@ -174,6 +175,22 @@ const webDefinition = { name: 'web_search', description: 'Search the web. Return
     keys: ['bash', 'read'],
   })
   console.log('injection: run_code_itself and run_code_subtools')
+
+  const { ctx: scriptCtx, programs: scriptPrograms, runtime: scriptRuntime } = harness()
+  scriptRuntime.programFormat = 'script'
+  scriptRuntime.retainsState = true
+  const scriptExecutor = new plugin.RunCodeItselfExecutor(scriptCtx, {})
+  scriptExecutor.programs = scriptPrograms
+  const { programSource: scriptSource, value: scriptValue } = await runProgram(scriptExecutor, {
+    code: 'return run_code_itself.value',
+    description: 'script mode',
+    value: 42,
+  })
+  assert.ok(scriptSource.startsWith('await (async () => {'))
+  assert.ok(scriptSource.includes('const run_code_itself = {'))
+  const scriptCompletion = await new AsyncFunction('return (' + scriptSource + ')')()
+  assert.equal(scriptCompletion, 42)
+  console.log('wrapper: script/repl modes use the same function-body semantics')
 }
 
 // --- __proto__ and U+2028 --------------------------------------------------

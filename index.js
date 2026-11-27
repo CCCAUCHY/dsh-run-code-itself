@@ -211,7 +211,12 @@ export class RunCodeItselfExecutor extends PtcExecutor {
       declarationFor(PROGRAM_SUBTOOLS, subtools),
       declarationFor(PROGRAM_ITSELF, args),
     ].join('\n')
-    return transport.execute({ ...args, code: prelude + '\n' + args.code }, exec)
+    const program = prelude + '\n' + args.code
+    const format = this.ctx.get('ptcRuntime')?.programFormat ?? 'function-body'
+    const code = format === 'function-body'
+      ? 'return await (async () => {\n' + program + '\n})()'
+      : 'await (async () => {\n' + program + '\n})()'
+    return transport.execute({ ...args, code }, exec)
   }
 }
 

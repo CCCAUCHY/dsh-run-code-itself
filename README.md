@@ -9,6 +9,8 @@ The direct tool stays run_code. Every call preloads two variables:
 
 Only run_code is callable directly. Every other tool is called from inside the program. The goal is simple: keep data out of the code string, and pass subtool arguments as real JSON objects rather than JSON strings.
 
+For PTC runtimes configured as script or repl, the plugin wraps the program in an async IIFE. The two prelude variables remain local, top-level return/await keep function-body semantics, and a second evaluation cannot hit a duplicate const declaration.
+
 ## What it does
 
 Instead of this:

@@ -9,6 +9,8 @@ DSH PTC 的 Data-Code Separation 插件。
 
 只有 run_code 可以直接调用；其他工具都要在程序内部调用。目标很简单：不要把数据写进 code 字符串，也不要把子工具参数作为 JSON 字符串传递，而是直接在兄弟字段里放真正的 JSON 对象。
 
+对于 PTC 的 script/repl 模式，插件会把程序包进 async IIFE；两个预置变量保持局部，顶层 return/await 仍按 function-body 语义工作，第二次执行也不会重复声明 const。
+
 ## 它做什么
 
 以前：
