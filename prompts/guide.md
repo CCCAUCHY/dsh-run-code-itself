@@ -1,5 +1,7 @@
 ## Program environment
 
+Only run_code is callable directly. A top-level call to any other tool is rejected; every other tool is reached from inside the program.
+
 The program receives bulk data through sibling fields of the run_code call and reads it from run_code_itself. Keep literals, JSON payloads, and escaping out of the program body; keep control flow in code.
 
 ## Runtime metadata
