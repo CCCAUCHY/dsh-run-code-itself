@@ -5,7 +5,7 @@ Data-Code Separation for DSH PTC.
 The direct tool stays run_code. Every call preloads two variables:
 
 - run_code_itself: the complete arguments of this call, including all sibling fields;
-- run_code_subtools: one entry per tool with description, compact signature, and input schema.
+- run_code_subtools: one entry per tool with its description and original parameters schema.
 
 Only run_code is callable directly. Every other tool is called from inside the program. The goal is simple: keep data out of the code string, and pass subtool arguments as real JSON objects rather than JSON strings.
 
@@ -22,7 +22,7 @@ write this:
 
 or build a schema-informed direct call:
 
-    {"code":"const s = run_code_subtools.write.schema; if (!s.required.every(k => k in run_code_itself.write)) throw new Error('missing write fields'); return (await tools.write(run_code_itself.write)).path","description":"Write file","write":{"file_path":"a.txt","content":"hi"}}
+    {"code":"const s = run_code_subtools.write.parameters; if (!s.required.every(k => k in run_code_itself.write)) throw new Error('missing write fields'); return (await tools.write(run_code_itself.write)).path","description":"Write file","write":{"file_path":"a.txt","content":"hi"}}
 
 Array and loop:
 
@@ -30,7 +30,7 @@ Array and loop:
 
 run_code_subtools is a plain JSON object. All visible tools are there, and the system guide also lists a compact directory of every tool; inspect details with Object.keys(run_code_subtools) or print a named entry.
 
-There are no generated templates. run_code_subtools.<tool>.schema is the tool's real input JSON Schema; build the argument object directly in a sibling field and let the tool schema validate it.
+There are no generated templates. run_code_subtools.<tool>.parameters is the tool's original input JSON Schema; build the argument object directly in a sibling field and let the tool schema validate it.
 
 ## System guide and tool description
 
@@ -66,7 +66,7 @@ Use this as the persona prefix; complete must remain false so the system guide i
       name: '@deepseek-ai/dsh-persona'
       config:
         prefix: |
-          You are a helpful software engineer assistant. You MUST follow the run_code usage rules in the run_code tool description. Never inline subtool arguments. Put them as real JSON objects in run_code_itself sibling fields; inspect run_code_subtools.<tool>.schema when needed, and return only JSON-safe values.
+          You are a helpful software engineer assistant. You MUST follow the run_code usage rules in the run_code tool description. Never inline subtool arguments. Put them as real JSON objects in run_code_itself sibling fields; inspect run_code_subtools.<tool>.parameters when needed, and return only JSON-safe values.
         complete: false
         includeRuntimeContext: false
 
@@ -80,7 +80,7 @@ Append a short section to the user/workspace AGENTS.md:
 
     - Never inline tools.x({...}) inside run_code code.
     - Put data and every subtool argument in sibling fields of the call.
-    - Read run_code_itself sibling fields; inspect run_code_subtools.<tool>.schema when needed; return only JSON-safe values.
+    - Read run_code_itself sibling fields; inspect run_code_subtools.<tool>.parameters when needed; return only JSON-safe values.
     - If a value needs quotes, backslashes, or newlines, move it to a sibling field.
 
 The repository's own cordis.patch.yml is deliberately []; do not copy the profile rows above into it.

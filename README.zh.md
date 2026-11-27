@@ -5,7 +5,7 @@ DSH PTC 的 Data-Code Separation 插件。
 直接工具仍然是 run_code。每次调用预置两个变量：
 
 - run_code_itself：本次调用的完整参数，包括所有兄弟字段；
-- run_code_subtools：每个工具的描述、紧凑签名和输入 schema。
+- run_code_subtools：每个工具的描述和原始 parameters schema。
 
 只有 run_code 可以直接调用；其他工具都要在程序内部调用。目标很简单：不要把数据写进 code 字符串，也不要把子工具参数作为 JSON 字符串传递，而是直接在兄弟字段里放真正的 JSON 对象。
 
@@ -22,7 +22,7 @@ DSH PTC 的 Data-Code Separation 插件。
 
 或者根据 schema 直接写一次调用：
 
-    {"code":"const s = run_code_subtools.write.schema; if (!s.required.every(k => k in run_code_itself.write)) throw new Error('missing write fields'); return (await tools.write(run_code_itself.write)).path","description":"写文件","write":{"file_path":"a.txt","content":"hi"}}
+    {"code":"const s = run_code_subtools.write.parameters; if (!s.required.every(k => k in run_code_itself.write)) throw new Error('missing write fields'); return (await tools.write(run_code_itself.write)).path","description":"写文件","write":{"file_path":"a.txt","content":"hi"}}
 
 数组与循环：
 
@@ -30,7 +30,7 @@ DSH PTC 的 Data-Code Separation 插件。
 
 run_code_subtools 是普通 JSON；所有可见工具都在里面，系统规范里也会列出全部工具的紧凑目录。可以用 Object.keys(run_code_subtools) 或打印某个条目。
 
-不再生成模板。run_code_subtools.<tool>.schema 是工具真实的输入 JSON Schema；直接在兄弟字段里构造参数对象，由工具 schema 校验。
+不再生成模板。run_code_subtools.<tool>.parameters 是工具原始的输入 JSON Schema；直接在兄弟字段里构造参数对象，由工具 schema 校验。
 
 ## 系统规范与工具描述
 
@@ -66,7 +66,7 @@ persona 必须使用 complete: false；complete: true 会抑制系统规范段�
       name: '@deepseek-ai/dsh-persona'
       config:
         prefix: |
-          You are a helpful software engineer assistant. You MUST follow the run_code usage rules in the run_code tool description. Never inline subtool arguments. Put them as real JSON objects in run_code_itself sibling fields; inspect run_code_subtools.<tool>.schema when needed, and return only JSON-safe values.
+          You are a helpful software engineer assistant. You MUST follow the run_code usage rules in the run_code tool description. Never inline subtool arguments. Put them as real JSON objects in run_code_itself sibling fields; inspect run_code_subtools.<tool>.parameters when needed, and return only JSON-safe values.
         complete: false
         includeRuntimeContext: false
 
@@ -80,7 +80,7 @@ persona 必须使用 complete: false；complete: true 会抑制系统规范段�
 
     - Never inline tools.x({...}) inside run_code code.
     - Put data and every subtool argument in sibling fields of the call.
-    - Read run_code_itself sibling fields; inspect run_code_subtools.<tool>.schema when needed; return only JSON-safe values.
+    - Read run_code_itself sibling fields; inspect run_code_subtools.<tool>.parameters when needed; return only JSON-safe values.
     - If a value needs quotes, backslashes, or newlines, move it to a sibling field.
 
 仓库自己的 cordis.patch.yml 故意保持 []；不要把上面的 profile 配置复制进去。

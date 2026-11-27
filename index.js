@@ -59,14 +59,13 @@ export function declarationFor(name, payload) {
   return 'const ' + name + ' = ' + jsonLiteral(payload) + ';'
 }
 
-/** Build one { description, signature, schema } entry per visible tool. */
+/** Build one { description, parameters } entry per visible tool. */
 export function buildSubtools(definitions) {
   const subtools = Object.create(null)
   for (const definition of definitions) {
     subtools[definition.name] = {
       description: definition.description === undefined ? '' : String(definition.description),
-      signature: signatureFor(definition),
-      schema: isObjectRecord(definition.parameters) ? definition.parameters : { type: 'object', properties: {} },
+      parameters: isObjectRecord(definition.parameters) ? definition.parameters : { type: 'object', properties: {} },
     }
   }
   return subtools
