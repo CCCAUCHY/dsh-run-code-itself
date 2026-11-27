@@ -1,1 +1,1 @@
-`run_code` is the only tool exposed for direct calls. A top-level call to any other tool name is rejected; invoke every other tool from inside the program.
+Only `run_code` may be called directly; a top-level call to any other tool is rejected. All other tools must be invoked from within the program.
