@@ -4,7 +4,7 @@
  * @module
  */
 import { readFileSync } from 'node:fs'
-import { PtcExecutor } from '@deepseek-ai/dsh-tool-executor-ptc'
+import { PtcExecutor, renderToolsSdk, renderToolsSdkPy } from '@deepseek-ai/dsh-tool-executor-ptc'
 import { RUN_CODE_NAME } from '@deepseek-ai/dsh-tools'
 import { scopeOf } from '@deepseek-ai/dsh-scope'
 import z from '@deepseek-ai/schemastery'
@@ -39,7 +39,8 @@ export const PROGRAM_TOOL = 'run_code'
 export const PROGRAM_ITSELF = 'run_code_itself'
 export const PROGRAM_SUBTOOLS = 'run_code_subtools'
 /** Fixed prompt data lives beside the code, not inside it. */
-const TOOL_DESCRIPTION = readFileSync(new URL('./prompts/tool-description.txt', import.meta.url), 'utf8').trim()
+const PTC_ONLY_TEXT = readFileSync(new URL('./prompts/ptc-only.txt', import.meta.url), 'utf8').trim()
+const TOOL_DESCRIPTION_TEMPLATE = readFileSync(new URL('./prompts/tool-description.txt', import.meta.url), 'utf8').trim()
 const GUIDE_TEMPLATE = readFileSync(new URL('./prompts/guide.md', import.meta.url), 'utf8').trim()
 
 /** True for a non-null non-array object. */
@@ -59,31 +60,22 @@ export function declarationFor(name, payload) {
   return 'const ' + name + ' = ' + jsonLiteral(payload) + ';'
 }
 
-/** Build one { description, parameters } entry per visible tool. */
-export function buildSubtools(definitions) {
+/** Build one entry per visible tool; common tools expose DSH's own fields. */
+export function buildSubtools(definitions, commonTools = DEFAULT_COMMON_TOOLS) {
+  const commonSet = new Set(Array.isArray(commonTools) ? commonTools : DEFAULT_COMMON_TOOLS)
   const subtools = Object.create(null)
   for (const definition of definitions) {
-    subtools[definition.name] = {
-      description: definition.description === undefined ? '' : String(definition.description),
-      parameters: isObjectRecord(definition.parameters) ? definition.parameters : { type: 'object', properties: {} },
-    }
+    subtools[definition.name] = commonSet.has(definition.name)
+      ? {
+          description: definition.description === undefined ? '' : String(definition.description),
+          parameters: isObjectRecord(definition.parameters) ? definition.parameters : { type: 'object', properties: {} },
+        }
+      : { signature: signatureFor(definition) }
   }
   return subtools
 }
 
-/** First sentence of a tool description. */
-function firstSentence(text) {
-  const value = typeof text === 'string' ? text : ''
-  const index = value.indexOf('. ')
-  return index === -1 ? value : value.slice(0, index + 1)
-}
-
-/** Collapse one-line JSDoc text. */
-function docText(text) {
-  return (typeof text === 'string' ? text : '').replace(/\*\//g, '* /').replace(/\s+/g, ' ').trim()
-}
-
-/** Compact argument and return names for one tool. */
+/** Compact argument and return hint for non-common tools. */
 function signatureFor(definition) {
   const parameters = isObjectRecord(definition.parameters) ? definition.parameters : {}
   const properties = isObjectRecord(parameters.properties) ? parameters.properties : {}
@@ -94,19 +86,26 @@ function signatureFor(definition) {
   return definition.name + '(' + args + ') -> ' + (outputProperties.length > 0 ? '{' + outputProperties.join(', ') + '}' : 'JsonValue')
 }
 
-/** Render compact lines for one tool group. */
-function renderToolLines(tools) {
-  return tools.map(tool => '- ' + signatureFor(tool) + ': ' + firstSentence(docText(tool.description))).join('\n')
+/** Rewritten equivalent of PTC's sandbox escalation guidance. */
+function sandboxGuidance(mode) {
+  return mode === undefined ? ''
+    : ' A wider sandbox approval covers this complete program run only. Nested tools keep their own policies. Request wider access only after a denial proves it is needed; earlier effects may remain, so inspect them before retrying. Programs are never replayed automatically.'
 }
 
-/** The complete system-prompt guide, loaded from prompts/guide.md. */
-export function renderProgramGuide(tools, commonTools = DEFAULT_COMMON_TOOLS) {
-  const commonSet = new Set(Array.isArray(commonTools) ? commonTools : DEFAULT_COMMON_TOOLS)
-  const common = tools.filter(tool => commonSet.has(tool.name))
-  const other = tools.filter(tool => !commonSet.has(tool.name))
-  return GUIDE_TEMPLATE
-    .replaceAll('{{COMMON_TOOLS}}', () => renderToolLines(common))
-    .replaceAll('{{OTHER_TOOLS}}', () => renderToolLines(other))
+/** Rewritten dynamic tool description; all runtime content is preserved. */
+function renderToolDescription(ctx) {
+  const runtime = ctx.get('ptcRuntime')
+  const instructions = typeof runtime?.executionInstructions === 'string' ? runtime.executionInstructions.trim() : ''
+  const programDescription = 'the body of an async TypeScript function (erasable syntax only; top-level await and return work)'
+  return TOOL_DESCRIPTION_TEMPLATE
+    .replaceAll('{{PROGRAM_DESCRIPTION}}', () => programDescription)
+    .replaceAll('{{EXECUTION_INSTRUCTIONS}}', () => instructions.length === 0 ? '' : ' ' + instructions)
+    .replaceAll('{{SANDBOX_GUIDANCE}}', () => sandboxGuidance(runtime?.sandboxMode))
+}
+
+/** Rewritten equivalent of PTC's SDK section; sdkText is the generated declarations. */
+export function renderProgramGuide(_tools, sdkText = '') {
+  return GUIDE_TEMPLATE.replaceAll('{{SDK}}', () => sdkText)
 }
 
 /** The run_code transport with the run_code alias and injected variables. */
@@ -119,12 +118,38 @@ export class RunCodeItselfExecutor extends PtcExecutor {
       ...(maxSubCallsPerMinute === undefined ? {} : { maxSubCallsPerMinute }),
       ...(maxParallelSubCalls === undefined ? {} : { maxParallelSubCalls }),
     })
-    this.sections = [{
-      name: 'tools:run_code',
-      order: ctx.systemPrompt.getSectionOrder('TOOLS_SDK'),
-      interpolate: false,
-      text: tools => renderProgramGuide(tools, commonTools),
-    }]
+    this.commonTools = Array.isArray(commonTools) ? commonTools : DEFAULT_COMMON_TOOLS
+    this.sections = [
+      {
+        name: 'tools:ptc-only',
+        order: ctx.systemPrompt.getSectionOrder('PTC_ONLY'),
+        text: PTC_ONLY_TEXT,
+        interpolate: false,
+      },
+      {
+        name: 'tools:sdk',
+        order: ctx.systemPrompt.getSectionOrder('TOOLS_SDK'),
+        text: tools => renderProgramGuide(tools, this.#renderSdk(tools)),
+        interpolate: false,
+      },
+    ]
+  }
+
+  /** Generate the same dynamic SDK declarations as PTC, for our own wrapper. */
+  #renderSdk(tools) {
+    const runtime = this.ctx.get('ptcRuntime')
+    const language = runtime?.language === 'python' ? 'python' : 'typescript'
+    const render = language === 'python' ? renderToolsSdkPy : renderToolsSdk
+    const programFormat = runtime?.programFormat ?? 'function-body'
+    const rendered = render(tools.map(definition => ({
+      name: definition.name,
+      description: definition.description,
+      parameters: definition.parameters,
+      output: definition.output?.schema ?? {},
+    })), programFormat)
+    const marker = language === 'python' ? '\u0060\u0060\u0060python' : '\u0060\u0060\u0060ts'
+    const at = rendered.indexOf(marker)
+    return at === -1 ? rendered : rendered.slice(at)
   }
 
   /** Wrap the reserved transport once. */
@@ -152,11 +177,10 @@ export class RunCodeItselfExecutor extends PtcExecutor {
         const properties = isObjectRecord(parameters.properties) ? parameters.properties : {}
         const code = isObjectRecord(properties.code) ? properties.code : undefined
         const description = isObjectRecord(properties.description) ? properties.description : undefined
-        const baseDescription = typeof schema.description === 'string' ? schema.description : ''
         return {
           ...schema,
           name: PROGRAM_TOOL,
-          description: baseDescription.length === 0 ? TOOL_DESCRIPTION : TOOL_DESCRIPTION + ' ' + baseDescription,
+          description: renderToolDescription(this.ctx),
           parameters: {
             ...parameters,
             additionalProperties: true,
@@ -165,7 +189,7 @@ export class RunCodeItselfExecutor extends PtcExecutor {
               ...code === undefined ? {} : {
                 code: {
                   ...code,
-                  description: 'Program logic only. Data and subtool arguments are parsed values on run_code_itself; run_code_itself.code is this exact source text.',
+                  description: 'Program text: the body of an async TypeScript function. Data and nested tool arguments live in sibling fields on run_code_itself; run_code_itself.code is this exact source text.',
                 },
               },
               ...description === undefined ? {} : {
@@ -184,7 +208,7 @@ export class RunCodeItselfExecutor extends PtcExecutor {
   /** Inject the complete call and every tool schema before user code. */
   async #execute(transport, args, exec) {
     if (!isObjectRecord(args) || typeof args.code !== 'string') return transport.execute(args, exec)
-    const subtools = buildSubtools(this.ctx.tools.definitions(exec.agent, exec.toolSet))
+    const subtools = buildSubtools(this.ctx.tools.definitions(exec.agent, exec.toolSet), this.commonTools)
     const prelude = [
       declarationFor(PROGRAM_SUBTOOLS, subtools),
       declarationFor(PROGRAM_ITSELF, args),

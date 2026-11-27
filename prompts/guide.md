@@ -1,23 +1,18 @@
-## Data-Code Separation
+## Program environment
 
-Only run_code is callable directly. Every other tool is called from inside the program with tools.<name>(...).
+Only run_code is callable directly. A top-level call to any other tool is rejected; every other tool is reached from inside the program with tools.<name>(...).
 
-This tool runs one program. code is logic only. Data is supplied in sibling fields of the call and read inside the program from run_code_itself.
+The program receives bulk data through sibling fields of the run_code call and reads it from run_code_itself. Keep literals, JSON payloads, and escaping out of the program body; keep control flow in code.
 
-1. **Put arguments in sibling fields as real JSON objects.** Put data in a sibling field and pass run_code_itself.<field>. Never write tools.x({...}).
-2. **Never encode a subtool argument as a JSON string.** Do not JSON.stringify or JSON.parse a subtool argument, and do not place JSON text in a field.
-3. **Keep escaping out of code.** Any value that would need quotes, backslashes, or newlines belongs in a sibling field.
-4. **Short literals are for control only.** Loop bounds, flags, and conditions may stay in code; data literals move to fields.
-
-## Program variables
+## Runtime metadata
 
 run_code_itself: the complete arguments of this call, including every sibling field.
 run_code_subtools: one entry per tool, keyed by tool name.
 
-## Tool schema
+- Common tools: { description, parameters }.
+- Other tools: { signature }.
 
-run_code_subtools.<tool> = { description, parameters }.
-parameters is the tool's input JSON Schema. Build the actual argument object directly in a sibling field of the run_code call; do not pass a stringified schema.
+parameters is the tool's original input JSON Schema. signature is a compact parameter/return hint. Build nested tool arguments directly as real JSON objects in sibling fields; never encode an argument as a JSON string.
 
 ## Examples
 
@@ -32,12 +27,6 @@ Array and loop:
 
 Never write tools.bash({...}) or tools.x({...}) inside code.
 
-## Tools
+## Program tool bindings
 
-Common tools:
-
-{{COMMON_TOOLS}}
-
-Other tools:
-
-{{OTHER_TOOLS}}
+{{SDK}}
