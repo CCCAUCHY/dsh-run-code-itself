@@ -7,12 +7,17 @@ The program receives bulk data through sibling fields of the run_code call and r
 ## Runtime metadata
 
 run_code_itself: the complete arguments of this call, including every sibling field.
-run_code_subtools: one entry per tool, keyed by tool name.
+run_code_subtools: one complete entry per tool, keyed by tool name. Each entry is { description, parameters } with DSH's original fields, available for on-demand loading.
 
-- Common tools: { description, parameters }.
-- Other tools: { signature }.
+In this prompt, common tools show description and parameters; all other tools show only a compact signature. Read run_code_subtools when a full schema is needed.
 
-parameters is the tool's original input JSON Schema. signature is a compact parameter/return hint. Build nested tool arguments directly as real JSON objects in sibling fields; never encode an argument as a JSON string.
+## Common tools
+
+{{COMMON_TOOLS}}
+
+## Other tools
+
+{{OTHER_TOOLS}}
 
 ## Examples
 
@@ -26,7 +31,3 @@ Array and loop:
 {"code":"const out = []; for (const e of run_code_itself.edits) out.push(await tools.edit(e)); return out.map(r => r.path)","description":"Apply edits","edits":[{"file_path":"a.ts","old_string":"old","new_string":"new"},{"file_path":"b.ts","old_string":"old2","new_string":"new2"}]}
 
 Never write tools.bash({...}) or tools.x({...}) inside code.
-
-## Program tool bindings
-
-{{SDK}}

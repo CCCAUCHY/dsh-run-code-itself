@@ -4,7 +4,7 @@
  * @module
  */
 import { readFileSync } from 'node:fs'
-import { PtcExecutor, renderToolsSdk, renderToolsSdkPy } from '@deepseek-ai/dsh-tool-executor-ptc'
+import { PtcExecutor } from '@deepseek-ai/dsh-tool-executor-ptc'
 import { RUN_CODE_NAME } from '@deepseek-ai/dsh-tools'
 import { scopeOf } from '@deepseek-ai/dsh-scope'
 import z from '@deepseek-ai/schemastery'
@@ -60,17 +60,14 @@ export function declarationFor(name, payload) {
   return 'const ' + name + ' = ' + jsonLiteral(payload) + ';'
 }
 
-/** Build one entry per visible tool; common tools expose DSH's own fields. */
-export function buildSubtools(definitions, commonTools = DEFAULT_COMMON_TOOLS) {
-  const commonSet = new Set(Array.isArray(commonTools) ? commonTools : DEFAULT_COMMON_TOOLS)
+/** Build one complete entry per visible tool: both DSH original fields. */
+export function buildSubtools(definitions) {
   const subtools = Object.create(null)
   for (const definition of definitions) {
-    subtools[definition.name] = commonSet.has(definition.name)
-      ? {
-          description: definition.description === undefined ? '' : String(definition.description),
-          parameters: isObjectRecord(definition.parameters) ? definition.parameters : { type: 'object', properties: {} },
-        }
-      : { signature: signatureFor(definition) }
+    subtools[definition.name] = {
+      description: definition.description === undefined ? '' : String(definition.description),
+      parameters: isObjectRecord(definition.parameters) ? definition.parameters : { type: 'object', properties: {} },
+    }
   }
   return subtools
 }
@@ -103,9 +100,27 @@ function renderToolDescription(ctx) {
     .replaceAll('{{SANDBOX_GUIDANCE}}', () => sandboxGuidance(runtime?.sandboxMode))
 }
 
-/** Rewritten equivalent of PTC's SDK section; sdkText is the generated declarations. */
-export function renderProgramGuide(_tools, sdkText = '') {
-  return GUIDE_TEMPLATE.replaceAll('{{SDK}}', () => sdkText)
+/** Common tools in the prompt: both DSH original fields. */
+function renderCommonTools(tools) {
+  return tools.map(tool => {
+    const parameters = isObjectRecord(tool.parameters) ? tool.parameters : { type: 'object', properties: {} }
+    return '### ' + tool.name + '\ndescription: ' + String(tool.description ?? '') + '\nparameters:\n' + JSON.stringify(parameters, null, 2)
+  }).join('\n\n')
+}
+
+/** Other tools in the prompt: signature only. */
+function renderOtherTools(tools) {
+  return tools.map(tool => '- ' + signatureFor(tool)).join('\n')
+}
+
+/** Rewritten PTC SDK section; common tools full, other tools compact. */
+export function renderProgramGuide(tools, commonTools = DEFAULT_COMMON_TOOLS) {
+  const commonSet = new Set(Array.isArray(commonTools) ? commonTools : DEFAULT_COMMON_TOOLS)
+  const common = tools.filter(tool => commonSet.has(tool.name))
+  const other = tools.filter(tool => !commonSet.has(tool.name))
+  return GUIDE_TEMPLATE
+    .replaceAll('{{COMMON_TOOLS}}', () => renderCommonTools(common))
+    .replaceAll('{{OTHER_TOOLS}}', () => renderOtherTools(other))
 }
 
 /** The run_code transport with the run_code alias and injected variables. */
@@ -129,27 +144,10 @@ export class RunCodeItselfExecutor extends PtcExecutor {
       {
         name: 'tools:sdk',
         order: ctx.systemPrompt.getSectionOrder('TOOLS_SDK'),
-        text: tools => renderProgramGuide(tools, this.#renderSdk(tools)),
+        text: tools => renderProgramGuide(tools, this.commonTools),
         interpolate: false,
       },
     ]
-  }
-
-  /** Generate the same dynamic SDK declarations as PTC, for our own wrapper. */
-  #renderSdk(tools) {
-    const runtime = this.ctx.get('ptcRuntime')
-    const language = runtime?.language === 'python' ? 'python' : 'typescript'
-    const render = language === 'python' ? renderToolsSdkPy : renderToolsSdk
-    const programFormat = runtime?.programFormat ?? 'function-body'
-    const rendered = render(tools.map(definition => ({
-      name: definition.name,
-      description: definition.description,
-      parameters: definition.parameters,
-      output: definition.output?.schema ?? {},
-    })), programFormat)
-    const marker = language === 'python' ? '\u0060\u0060\u0060python' : '\u0060\u0060\u0060ts'
-    const at = rendered.indexOf(marker)
-    return at === -1 ? rendered : rendered.slice(at)
   }
 
   /** Wrap the reserved transport once. */
@@ -208,7 +206,7 @@ export class RunCodeItselfExecutor extends PtcExecutor {
   /** Inject the complete call and every tool schema before user code. */
   async #execute(transport, args, exec) {
     if (!isObjectRecord(args) || typeof args.code !== 'string') return transport.execute(args, exec)
-    const subtools = buildSubtools(this.ctx.tools.definitions(exec.agent, exec.toolSet), this.commonTools)
+    const subtools = buildSubtools(this.ctx.tools.definitions(exec.agent, exec.toolSet))
     const prelude = [
       declarationFor(PROGRAM_SUBTOOLS, subtools),
       declarationFor(PROGRAM_ITSELF, args),
