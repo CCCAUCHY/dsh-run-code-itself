@@ -7,7 +7,7 @@ The direct tool stays run_code. Every call preloads two variables:
 - run_code_itself: the complete arguments of this call, including all sibling fields;
 - run_code_subtools: one entry per tool with description, compact signature, and input schema.
 
-The goal is simple: keep data out of the code string.
+Only run_code is callable directly. Every other tool is called from inside the program. The goal is simple: keep data out of the code string, and pass subtool arguments as real JSON objects rather than JSON strings.
 
 ## What it does
 

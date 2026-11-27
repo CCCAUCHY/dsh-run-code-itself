@@ -7,7 +7,7 @@ DSH PTC 的 Data-Code Separation 插件。
 - run_code_itself：本次调用的完整参数，包括所有兄弟字段；
 - run_code_subtools：每个工具的描述、紧凑签名和输入 schema。
 
-目标很简单：不要把数据写进 code 字符串。
+只有 run_code 可以直接调用；其他工具都要在程序内部调用。目标很简单：不要把数据写进 code 字符串，也不要把子工具参数作为 JSON 字符串传递，而是直接在兄弟字段里放真正的 JSON 对象。
 
 ## 它做什么
 

@@ -153,10 +153,11 @@ export class RunCodeItselfExecutor extends PtcExecutor {
         const properties = isObjectRecord(parameters.properties) ? parameters.properties : {}
         const code = isObjectRecord(properties.code) ? properties.code : undefined
         const description = isObjectRecord(properties.description) ? properties.description : undefined
+        const baseDescription = typeof schema.description === 'string' ? schema.description : ''
         return {
           ...schema,
           name: PROGRAM_TOOL,
-          description: TOOL_DESCRIPTION,
+          description: baseDescription.length === 0 ? TOOL_DESCRIPTION : TOOL_DESCRIPTION + ' ' + baseDescription,
           parameters: {
             ...parameters,
             additionalProperties: true,
