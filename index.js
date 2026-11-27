@@ -4,7 +4,7 @@
  * @module
  */
 import { readFileSync } from 'node:fs'
-import { PtcExecutor } from '@deepseek-ai/dsh-tool-executor-ptc'
+import { PtcExecutor, renderToolsSdk, renderToolsSdkPy } from '@deepseek-ai/dsh-tool-executor-ptc'
 import { RUN_CODE_NAME } from '@deepseek-ai/dsh-tools'
 import { scopeOf } from '@deepseek-ai/dsh-scope'
 import z from '@deepseek-ai/schemastery'
@@ -60,16 +60,24 @@ export function declarationFor(name, payload) {
   return 'const ' + name + ' = ' + jsonLiteral(payload) + ';'
 }
 
-/** Build one complete entry per visible tool: both DSH original fields. */
+/** Build one complete entry per visible tool: DSH original fields plus output schema. */
 export function buildSubtools(definitions) {
   const subtools = Object.create(null)
   for (const definition of definitions) {
-    subtools[definition.name] = {
+    const entry = {
       description: definition.description === undefined ? '' : String(definition.description),
       parameters: isObjectRecord(definition.parameters) ? definition.parameters : { type: 'object', properties: {} },
     }
+    if (definition.output !== undefined && isObjectRecord(definition.output.schema)) entry.output = definition.output.schema
+    subtools[definition.name] = entry
   }
   return subtools
+}
+
+/** Quote a non-identifier key for display/TypeScript access. */
+function renderKey(value) {
+  const key = String(value)
+  return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key) ? key : JSON.stringify(key)
 }
 
 /** Compact argument and return hint for non-common tools. */
@@ -77,10 +85,10 @@ function signatureFor(definition) {
   const parameters = isObjectRecord(definition.parameters) ? definition.parameters : {}
   const properties = isObjectRecord(parameters.properties) ? parameters.properties : {}
   const required = new Set(Array.isArray(parameters.required) ? parameters.required : [])
-  const args = Object.keys(properties).map(key => required.has(key) ? key : key + '?').join(', ')
+  const args = Object.keys(properties).map(key => renderKey(key) + (required.has(key) ? '' : '?')).join(', ')
   const output = definition.output !== undefined && isObjectRecord(definition.output.schema) ? definition.output.schema : {}
   const outputProperties = isObjectRecord(output.properties) ? Object.keys(output.properties) : []
-  return definition.name + '(' + args + ') -> ' + (outputProperties.length > 0 ? '{' + outputProperties.join(', ') + '}' : 'JsonValue')
+  return renderKey(definition.name) + '(' + args + ') -> ' + (outputProperties.length > 0 ? '{' + outputProperties.map(renderKey).join(', ') + '}' : 'JsonValue')
 }
 
 /** Rewritten equivalent of PTC's sandbox escalation guidance. */
@@ -93,11 +101,12 @@ function sandboxGuidance(mode) {
 function renderToolDescription(ctx) {
   const runtime = ctx.get('ptcRuntime')
   const instructions = typeof runtime?.executionInstructions === 'string' ? runtime.executionInstructions.trim() : ''
-  const programDescription = 'the body of an async TypeScript function (erasable syntax only; top-level await and return work)'
-  return TOOL_DESCRIPTION_TEMPLATE
-    .replaceAll('{{PROGRAM_DESCRIPTION}}', () => programDescription)
-    .replaceAll('{{EXECUTION_INSTRUCTIONS}}', () => instructions.length === 0 ? '' : ' ' + instructions)
-    .replaceAll('{{SANDBOX_GUIDANCE}}', () => sandboxGuidance(runtime?.sandboxMode))
+  const values = {
+    PROGRAM_DESCRIPTION: 'the body of an async TypeScript function (erasable syntax only; top-level await and return work)',
+    EXECUTION_INSTRUCTIONS: instructions.length === 0 ? '' : ' ' + instructions,
+    SANDBOX_GUIDANCE: sandboxGuidance(runtime?.sandboxMode),
+  }
+  return TOOL_DESCRIPTION_TEMPLATE.replace(/\{\{(PROGRAM_DESCRIPTION|EXECUTION_INSTRUCTIONS|SANDBOX_GUIDANCE)\}\}/g, (_, key) => values[key])
 }
 
 /** Common tools in the prompt: both DSH original fields. */
@@ -114,13 +123,16 @@ function renderOtherTools(tools) {
 }
 
 /** Rewritten PTC SDK section; common tools full, other tools compact. */
-export function renderProgramGuide(tools, commonTools = DEFAULT_COMMON_TOOLS) {
+export function renderProgramGuide(tools, commonTools = DEFAULT_COMMON_TOOLS, sdkText = '') {
   const commonSet = new Set(Array.isArray(commonTools) ? commonTools : DEFAULT_COMMON_TOOLS)
   const common = tools.filter(tool => commonSet.has(tool.name))
   const other = tools.filter(tool => !commonSet.has(tool.name))
-  return GUIDE_TEMPLATE
-    .replaceAll('{{COMMON_TOOLS}}', () => renderCommonTools(common))
-    .replaceAll('{{OTHER_TOOLS}}', () => renderOtherTools(other))
+  const values = {
+    COMMON_TOOLS: renderCommonTools(common),
+    OTHER_TOOLS: renderOtherTools(other),
+    SDK: sdkText,
+  }
+  return GUIDE_TEMPLATE.replace(/\{\{(COMMON_TOOLS|OTHER_TOOLS|SDK)\}\}/g, (_, key) => values[key])
 }
 
 /** The run_code transport with the run_code alias and injected variables. */
@@ -144,10 +156,31 @@ export class RunCodeItselfExecutor extends PtcExecutor {
       {
         name: 'tools:sdk',
         order: ctx.systemPrompt.getSectionOrder('TOOLS_SDK'),
-        text: tools => renderProgramGuide(tools, this.commonTools),
+        text: tools => renderProgramGuide(tools, this.commonTools, this.#renderSdk(tools)),
         interpolate: false,
       },
     ]
+  }
+
+  /** Generate typed SDK declarations for common tools only. */
+  #renderSdk(tools) {
+    const commonSet = new Set(this.commonTools)
+    const common = tools.filter(tool => commonSet.has(tool.name))
+    if (common.length === 0) return ''
+    const runtime = this.ctx.get('ptcRuntime')
+    const language = runtime?.language === 'python' ? 'python' : 'typescript'
+    const render = language === 'python' ? renderToolsSdkPy : renderToolsSdk
+    const programFormat = runtime?.programFormat ?? 'function-body'
+    const rendered = render(common.map(definition => ({
+      name: definition.name,
+      description: definition.description,
+      parameters: definition.parameters,
+      output: definition.output?.schema ?? {},
+    })), programFormat)
+    const tick = String.fromCharCode(96).repeat(3)
+    const marker = tick + (language === 'python' ? 'python' : 'ts')
+    const at = rendered.indexOf(marker)
+    return at === -1 ? rendered : rendered.slice(at)
   }
 
   /** Wrap the reserved transport once. */

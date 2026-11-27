@@ -110,11 +110,14 @@ const webDefinition = { name: 'web_search', description: 'Search the web. Return
   assert.ok(schema.parameters.properties.code.description.includes('run_code_itself'))
   console.log('schema: neutral run_code name and short description')
 
-  const guide = plugin.renderProgramGuide([bashDefinition, readDefinition, webDefinition], ['bash'])
+  const sdk = '\u0060\u0060\u0060ts\ninterface ToolArgsMap { bash: unknown }\n\u0060\u0060\u0060'
+  const guide = plugin.renderProgramGuide([bashDefinition, readDefinition, webDefinition], ['bash'], sdk)
   assert.ok(guide.includes('## Program environment'))
   assert.ok(guide.includes('## Runtime metadata'))
+  assert.ok(guide.includes('## Calling contract'))
   assert.ok(guide.includes('## Common tools'))
   assert.ok(guide.includes('## Other tools'))
+  assert.ok(guide.includes('## Common tool SDK declarations'))
   assert.ok(guide.includes('## Examples'))
   assert.ok(guide.includes('Only run_code is callable directly'))
   assert.ok(guide.includes('### bash'))
@@ -128,18 +131,41 @@ const webDefinition = { name: 'web_search', description: 'Search the web. Return
   assert.ok(guide.includes('"write":{"file_path":"a.txt"'))
   assert.ok(guide.includes('Array and loop:'))
   assert.ok(guide.includes('return out.map(r => r.path)'))
+  assert.ok(guide.includes(sdk))
+  assert.ok(guide.includes('tools["my-tool"]'))
   assert.ok(guide.length > schema.description.length)
+
+  const oddDefinition = { name: 'my-tool', description: 'Odd tool.', parameters: { type: 'object', properties: { 'a-b': { type: 'string' } } }, output: { schema: { type: 'object', properties: { 'r-x': { type: 'string' } } } } }
+  const oddGuide = plugin.renderProgramGuide([bashDefinition, oddDefinition], ['bash'])
+  assert.ok(oddGuide.includes('- "my-tool"("a-b"?'))
+  assert.ok(oddGuide.includes('r-x'))
+  const placeholderDefinition = { name: 'placeholder', description: 'Contains {{OTHER_TOOLS}} in its description.', parameters: { type: 'object', properties: {} }, output: { schema: {} } }
+  const placeholderGuide = plugin.renderProgramGuide([placeholderDefinition], ['placeholder'], 'SDK {{COMMON_TOOLS}}')
+  assert.ok(placeholderGuide.includes('Contains {{OTHER_TOOLS}} in its description.'))
+  assert.ok(placeholderGuide.includes('SDK {{COMMON_TOOLS}}'))
+  console.log('guide: special names quoted; injected text is not re-expanded')
   assert.deepEqual(plugin.DEFAULT_COMMON_TOOLS, ['bash', 'read', 'write', 'edit', 'glob', 'grep', 'read_image'])
+
+  const dynamic = harness()
+  dynamic.runtime.executionInstructions = 'Use stdout deliberately.'
+  dynamic.runtime.sandboxMode = 'workspace-write'
+  const dynamicExecutor = new plugin.RunCodeItselfExecutor(dynamic.ctx, {})
+  const dynamicDescription = dynamicExecutor.describe([bashDefinition]).schemas[0].description
+  assert.ok(dynamicDescription.includes('Use stdout deliberately.'))
+  assert.ok(dynamicDescription.includes('wider sandbox approval'))
+  assert.ok(dynamicDescription.includes("Session's current directory"))
+  console.log('tool description: dynamic runtime content preserved')
 
   const subtools = plugin.buildSubtools([bashDefinition, readDefinition])
   assert.equal(subtools.bash.description, 'Execute a shell command and return stdout/stderr.')
   assert.equal(subtools.bash.parameters.type, 'object')
   assert.deepEqual(subtools.bash.parameters.required, ['description', 'command'])
-  assert.deepEqual(Object.keys(subtools.bash).sort(), ['description', 'parameters'])
+  assert.deepEqual(Object.keys(subtools.bash).sort(), ['description', 'output', 'parameters'])
+  assert.equal(subtools.bash.output.type, 'object')
   assert.equal(subtools.read.description, 'Read a UTF-8 text file and return line-numbered content.')
   assert.equal(subtools.read.parameters.type, 'object')
-  assert.deepEqual(Object.keys(subtools.read).sort(), ['description', 'parameters'])
-  console.log('tool metadata: every entry has original description and parameters')
+  assert.deepEqual(Object.keys(subtools.read).sort(), ['description', 'output', 'parameters'])
+  console.log('tool metadata: every entry has original description, parameters, and output')
 
   assert.equal(executor.sections.length, 2)
   assert.equal(executor.sections[0].name, 'tools:ptc-only')
@@ -150,7 +176,8 @@ const webDefinition = { name: 'web_search', description: 'Search the web. Return
   assert.ok(configuredGuide.includes('### bash'))
   assert.ok(configuredGuide.includes('- read('))
   assert.ok(!configuredGuide.includes('### read'))
-  console.log('sections: rewritten ptc-only and sdk; commonTools controls prompt split')
+  assert.ok(configuredGuide.includes('declare const tools'))
+  console.log('sections: rewritten ptc-only/sdk; common SDK and other signatures')
 }
 
 // --- injection and run_code variables ---------------------------------------

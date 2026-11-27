@@ -8,8 +8,6 @@ Paste the block below into the `run-code-itself` entry (around line 322).
           - id: run-code-itself
             name: 'dsh-run-code-itself'
             config:
-              promptMode: system
-              sdkStyle: rules
               commonTools:
                 - bash
                 - read
