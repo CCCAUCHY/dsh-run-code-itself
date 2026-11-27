@@ -9,7 +9,7 @@ The program receives bulk data through sibling fields of the run_code call and r
 run_code_itself: the complete arguments of this call, including every sibling field.
 run_code_subtools: one complete entry per tool, keyed by tool name. Each entry is { description, parameters, output? } with DSH's original fields, available for on-demand loading.
 
-In this prompt, common tools show description and parameters; all other tools show only a compact signature. Read run_code_subtools when a full schema is needed.
+Common tools are declared by the typed SDK below. Other tools are listed by signature; read run_code_subtools when a full schema is needed.
 
 ## Calling contract
 
@@ -18,10 +18,6 @@ In this prompt, common tools show description and parameters; all other tools sh
 - Promise.all may overlap independent read-only calls; mutating calls are ordered.
 - Arguments and results are lossless JSON. Return only JSON-safe values.
 - Common tools have the typed SDK declarations below. Other tools are used through their signatures and run_code_subtools.parameters.
-
-## Common tools
-
-{{COMMON_TOOLS}}
 
 ## Other tools
 

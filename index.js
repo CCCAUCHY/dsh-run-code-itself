@@ -109,14 +109,6 @@ function renderToolDescription(ctx) {
   return TOOL_DESCRIPTION_TEMPLATE.replace(/\{\{(PROGRAM_DESCRIPTION|EXECUTION_INSTRUCTIONS|SANDBOX_GUIDANCE)\}\}/g, (_, key) => values[key])
 }
 
-/** Common tools in the prompt: both DSH original fields. */
-function renderCommonTools(tools) {
-  return tools.map(tool => {
-    const parameters = isObjectRecord(tool.parameters) ? tool.parameters : { type: 'object', properties: {} }
-    return '### ' + tool.name + '\ndescription: ' + String(tool.description ?? '') + '\nparameters:\n' + JSON.stringify(parameters, null, 2)
-  }).join('\n\n')
-}
-
 /** Other tools in the prompt: signature only. */
 function renderOtherTools(tools) {
   return tools.map(tool => '- ' + signatureFor(tool)).join('\n')
@@ -125,14 +117,12 @@ function renderOtherTools(tools) {
 /** Rewritten PTC SDK section; common tools full, other tools compact. */
 export function renderProgramGuide(tools, commonTools = DEFAULT_COMMON_TOOLS, sdkText = '') {
   const commonSet = new Set(Array.isArray(commonTools) ? commonTools : DEFAULT_COMMON_TOOLS)
-  const common = tools.filter(tool => commonSet.has(tool.name))
   const other = tools.filter(tool => !commonSet.has(tool.name))
   const values = {
-    COMMON_TOOLS: renderCommonTools(common),
     OTHER_TOOLS: renderOtherTools(other),
     SDK: sdkText,
   }
-  return GUIDE_TEMPLATE.replace(/\{\{(COMMON_TOOLS|OTHER_TOOLS|SDK)\}\}/g, (_, key) => values[key])
+  return GUIDE_TEMPLATE.replace(/\{\{(OTHER_TOOLS|SDK)\}\}/g, (_, key) => values[key])
 }
 
 /** The run_code transport with the run_code alias and injected variables. */
@@ -226,7 +216,7 @@ export class RunCodeItselfExecutor extends PtcExecutor {
               ...description === undefined ? {} : {
                 description: {
                   ...description,
-                  description: 'Short active-voice summary of what this run_code does, 5-10 words (shown in the UI).',
+                  description: 'Short active-voice summary of what this run_code does (shown in the UI).',
                 },
               },
             },

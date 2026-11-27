@@ -115,14 +115,10 @@ const webDefinition = { name: 'web_search', description: 'Search the web. Return
   assert.ok(guide.includes('## Program environment'))
   assert.ok(guide.includes('## Runtime metadata'))
   assert.ok(guide.includes('## Calling contract'))
-  assert.ok(guide.includes('## Common tools'))
   assert.ok(guide.includes('## Other tools'))
   assert.ok(guide.includes('## Common tool SDK declarations'))
   assert.ok(guide.includes('## Examples'))
   assert.ok(guide.includes('Only run_code is callable directly'))
-  assert.ok(guide.includes('### bash'))
-  assert.ok(guide.includes('description: Execute a shell command'))
-  assert.ok(guide.includes('parameters:'))
   assert.ok(guide.includes('- read('))
   assert.ok(guide.includes('- web_search('))
   assert.ok(guide.includes('run_code_itself.errPrefix'))
@@ -139,10 +135,9 @@ const webDefinition = { name: 'web_search', description: 'Search the web. Return
   const oddGuide = plugin.renderProgramGuide([bashDefinition, oddDefinition], ['bash'])
   assert.ok(oddGuide.includes('- "my-tool"("a-b"?'))
   assert.ok(oddGuide.includes('r-x'))
-  const placeholderDefinition = { name: 'placeholder', description: 'Contains {{OTHER_TOOLS}} in its description.', parameters: { type: 'object', properties: {} }, output: { schema: {} } }
-  const placeholderGuide = plugin.renderProgramGuide([placeholderDefinition], ['placeholder'], 'SDK {{COMMON_TOOLS}}')
-  assert.ok(placeholderGuide.includes('Contains {{OTHER_TOOLS}} in its description.'))
-  assert.ok(placeholderGuide.includes('SDK {{COMMON_TOOLS}}'))
+  const placeholderDefinition = { name: 'placeholder', description: 'Other tool.', parameters: { type: 'object', properties: {} }, output: { schema: {} } }
+  const placeholderGuide = plugin.renderProgramGuide([bashDefinition, placeholderDefinition], ['bash'], 'SDK {{OTHER_TOOLS}}')
+  assert.ok(placeholderGuide.includes('SDK {{OTHER_TOOLS}}'))
   console.log('guide: special names quoted; injected text is not re-expanded')
   assert.deepEqual(plugin.DEFAULT_COMMON_TOOLS, ['bash', 'read', 'write', 'edit', 'glob', 'grep', 'read_image'])
 
@@ -173,10 +168,10 @@ const webDefinition = { name: 'web_search', description: 'Search the web. Return
   const { ctx: configuredCtx } = harness()
   const configuredExecutor = new plugin.RunCodeItselfExecutor(configuredCtx, { commonTools: ['bash'] })
   const configuredGuide = configuredExecutor.sections[1].text([bashDefinition, readDefinition, webDefinition])
-  assert.ok(configuredGuide.includes('### bash'))
-  assert.ok(configuredGuide.includes('- read('))
-  assert.ok(!configuredGuide.includes('### read'))
+  assert.ok(configuredGuide.includes('## Common tool SDK declarations'))
   assert.ok(configuredGuide.includes('declare const tools'))
+  assert.ok(configuredGuide.includes('- read('))
+  assert.ok(!configuredGuide.includes('### bash'))
   console.log('sections: rewritten ptc-only/sdk; common SDK and other signatures')
 }
 

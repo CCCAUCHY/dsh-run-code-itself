@@ -5,7 +5,7 @@ Data-Code Separation for DSH PTC.
 The direct tool stays run_code. Every call preloads two variables:
 
 - run_code_itself: the complete arguments of this call, including all sibling fields;
-- run_code_subtools: every tool exposes DSH's original description, parameters, and output schema; the system prompt shows common tools in full with typed SDK and other tools by signature.
+- run_code_subtools: every tool exposes DSH's original description, parameters, and output schema; the system prompt represents common tools by typed SDK declarations and other tools by signature.
 
 Only run_code is callable directly. Every other tool is called from inside the program. The goal is simple: keep data out of the code string, and pass subtool arguments as real JSON objects rather than JSON strings.
 
@@ -30,7 +30,7 @@ Array and loop:
 
     {"code":"const out = []; for (const e of run_code_itself.edits) out.push(await tools.edit(e)); return out.map(r => r.path)","description":"Apply edits","edits":[{"file_path":"a.ts","old_string":"old","new_string":"new"},{"file_path":"b.ts","old_string":"old2","new_string":"new2"}]}
 
-run_code_subtools is a plain JSON object keyed by tool name; every entry carries the complete description + parameters + output schema for on-demand loading. In the system prompt, common tools are shown in full with typed SDK declarations and all others use a compact signature.
+run_code_subtools is a plain JSON object keyed by tool name; every entry carries the complete description + parameters + output schema for on-demand loading. In the system prompt, common tools use typed SDK declarations and all others use a compact signature.
 
 There are no generated templates. run_code_subtools.<tool>.parameters is the tool's original input JSON Schema for every tool; build the argument object directly in a sibling field and let the tool schema validate it. run_code_subtools.<tool>.output is the original output schema. The prompt's signature is only a compact hint for non-common tools.
 
@@ -39,7 +39,7 @@ There are no generated templates. run_code_subtools.<tool>.parameters is the too
 The system prompt contains:
 
 - Data-Code Separation rules, rewritten from the stock PTC wording;
-- common tools with full description + parameters + typed SDK, other tools with compact signature;
+- common tools with typed SDK declarations, other tools with compact signature;
 - runtime metadata exposing { description, parameters, output } for every tool, available on demand through run_code_subtools.
 
 The run_code tool description is rewritten too; it preserves the runtime execution instructions, current-directory text, and sandbox guidance. The system guide is longer than the tool description.
@@ -108,7 +108,7 @@ Host row:
 
 - maxSubCallsPerMinute: nested tool-call attempts per minute of run_code timeout.
 - maxParallelSubCalls: maximum overlapping concurrency-safe program subcalls.
-- commonTools: tools shown in full with typed SDK in the system prompt; all other tools use signature there. run_code_subtools always has full description + parameters + output for every tool. Default: bash, read, write, edit, glob, grep, read_image.
+- commonTools: tools represented by typed SDK in the system prompt; all other tools use signature there. run_code_subtools always has full description + parameters + output for every tool. Default: bash, read, write, edit, glob, grep, read_image.
 - promptMode and sdkStyle: deprecated, accepted for compatibility, ignored.
 
 Example profile config:

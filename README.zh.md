@@ -5,7 +5,7 @@ DSH PTC 的 Data-Code Separation 插件。
 直接工具仍然是 run_code。每次调用预置两个变量：
 
 - run_code_itself：本次调用的完整参数，包括所有兄弟字段；
-- run_code_subtools：每个工具都给出 DSH 原始 description、parameters 和 output schema；系统提示词里常用工具展开并带 typed SDK，其他工具只给 signature。
+- run_code_subtools：每个工具都给出 DSH 原始 description、parameters 和 output schema；系统提示词里常用工具用 typed SDK 表示，其他工具只给 signature。
 
 只有 run_code 可以直接调用；其他工具都要在程序内部调用。目标很简单：不要把数据写进 code 字符串，也不要把子工具参数作为 JSON 字符串传递，而是直接在兄弟字段里放真正的 JSON 对象。
 
@@ -30,7 +30,7 @@ DSH PTC 的 Data-Code Separation 插件。
 
     {"code":"const out = []; for (const e of run_code_itself.edits) out.push(await tools.edit(e)); return out.map(r => r.path)","description":"批量编辑","edits":[{"file_path":"a.ts","old_string":"old","new_string":"new"},{"file_path":"b.ts","old_string":"old2","new_string":"new2"}]}
 
-run_code_subtools 是按工具名索引的普通 JSON；每项都带完整 description + parameters + output schema，供按需加载。系统提示词里常用工具展开并带 typed SDK，其他工具只给紧凑 signature。
+run_code_subtools 是按工具名索引的普通 JSON；每项都带完整 description + parameters + output schema，供按需加载。系统提示词里常用工具用 typed SDK 声明，其他工具只给紧凑 signature。
 
 不再生成模板。每个工具的 run_code_subtools.<tool>.parameters 都是工具原始输入 JSON Schema，run_code_subtools.<tool>.output 是原始输出 schema；直接在兄弟字段里构造参数对象，由工具 schema 校验。提示词里的 signature 只是非常用工具的紧凑提示。
 
@@ -39,7 +39,7 @@ run_code_subtools 是按工具名索引的普通 JSON；每项都带完整 descr
 系统提示词包含：
 
 - 重写过的 Data-Code Separation 规则；
-- 常用工具展开 description + parameters + typed SDK，其他工具只给紧凑 signature；
+- 常用工具用 typed SDK 声明，其他工具只给紧凑 signature；
 - 运行时元数据里每个工具都暴露 { description, parameters, output }，可按需从 run_code_subtools 读取。
 
 run_code 工具描述也重写了，并保留 runtime execution instructions、当前目录和 sandbox 提示。系统规范段比工具描述长。
@@ -108,7 +108,7 @@ Host 行：
 
 - maxSubCallsPerMinute：run_code 超时内每分钟的嵌套调用尝试数。
 - maxParallelSubCalls：并发安全的子调用上限。
-- commonTools：在系统提示词里展开 description + parameters + typed SDK 的工具；其他工具在提示词里只显示 signature。run_code_subtools 始终包含所有工具的完整 description + parameters + output。默认：bash、read、write、edit、glob、grep、read_image。
+- commonTools：在系统提示词里用 typed SDK 表示的工具；其他工具在提示词里只显示 signature。run_code_subtools 始终包含所有工具的完整 description + parameters + output。默认：bash、read、write、edit、glob、grep、read_image。
 - promptMode / sdkStyle：已废弃，仅为兼容保留，忽略。
 
 profile 配置示例：
