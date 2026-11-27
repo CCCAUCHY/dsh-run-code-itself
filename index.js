@@ -4,7 +4,7 @@
  * @module
  */
 import { readFileSync } from 'node:fs'
-import { PtcExecutor, renderToolsSdk, renderToolsSdkPy } from '@deepseek-ai/dsh-tool-executor-ptc'
+import { PtcExecutor } from '@deepseek-ai/dsh-tool-executor-ptc'
 import { RUN_CODE_NAME } from '@deepseek-ai/dsh-tools'
 import { scopeOf } from '@deepseek-ai/dsh-scope'
 import z from '@deepseek-ai/schemastery'
@@ -114,15 +114,15 @@ function renderOtherTools(tools) {
   return tools.map(tool => '- ' + signatureFor(tool)).join('\n')
 }
 
-/** Rewritten PTC SDK section; common tools full, other tools compact. */
-export function renderProgramGuide(tools, commonTools = DEFAULT_COMMON_TOOLS, sdkText = '') {
+/** Rewritten PTC section; common tool JSON, other tools compact. */
+export function renderProgramGuide(tools, commonTools = DEFAULT_COMMON_TOOLS, commonJson = '') {
   const commonSet = new Set(Array.isArray(commonTools) ? commonTools : DEFAULT_COMMON_TOOLS)
   const other = tools.filter(tool => !commonSet.has(tool.name))
   const values = {
     OTHER_TOOLS: renderOtherTools(other),
-    SDK: sdkText,
+    COMMON_TOOLS_JSON: commonJson,
   }
-  return GUIDE_TEMPLATE.replace(/\{\{(OTHER_TOOLS|SDK)\}\}/g, (_, key) => values[key])
+  return GUIDE_TEMPLATE.replace(/\{\{(OTHER_TOOLS|COMMON_TOOLS_JSON)\}\}/g, (_, key) => values[key])
 }
 
 /** The run_code transport with the run_code alias and injected variables. */
@@ -146,31 +146,17 @@ export class RunCodeItselfExecutor extends PtcExecutor {
       {
         name: 'tools:sdk',
         order: ctx.systemPrompt.getSectionOrder('TOOLS_SDK'),
-        text: tools => renderProgramGuide(tools, this.commonTools, this.#renderSdk(tools)),
+        text: tools => renderProgramGuide(tools, this.commonTools, this.#renderCommonJson(tools)),
         interpolate: false,
       },
     ]
   }
 
-  /** Generate typed SDK declarations for common tools only. */
-  #renderSdk(tools) {
+  /** Generate common tool metadata as plain JSON, compatible with run_code_subtools. */
+  #renderCommonJson(tools) {
     const commonSet = new Set(this.commonTools)
     const common = tools.filter(tool => commonSet.has(tool.name))
-    if (common.length === 0) return ''
-    const runtime = this.ctx.get('ptcRuntime')
-    const language = runtime?.language === 'python' ? 'python' : 'typescript'
-    const render = language === 'python' ? renderToolsSdkPy : renderToolsSdk
-    const programFormat = runtime?.programFormat ?? 'function-body'
-    const rendered = render(common.map(definition => ({
-      name: definition.name,
-      description: definition.description,
-      parameters: definition.parameters,
-      output: definition.output?.schema ?? {},
-    })), programFormat)
-    const tick = String.fromCharCode(96).repeat(3)
-    const marker = tick + (language === 'python' ? 'python' : 'ts')
-    const at = rendered.indexOf(marker)
-    return at === -1 ? rendered : rendered.slice(at)
+    return JSON.stringify(buildSubtools(common), null, 2)
   }
 
   /** Wrap the reserved transport once. */

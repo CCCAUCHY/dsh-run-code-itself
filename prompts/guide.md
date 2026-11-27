@@ -7,15 +7,17 @@
 - A failed nested call rejects with ToolCallError carrying toolName and message; catch it when the program should continue.
 - Promise.all may overlap independent read-only calls; mutating calls are ordered.
 - Arguments and results are lossless JSON. Return only JSON-safe values. Only printed or returned values are program output; image-bearing results attach after the run.
-- Common tools have typed SDK declarations below. Other tools use their signatures and run_code_subtools.parameters.
+- Common tools have JSON contracts below. Other tools use their signatures and run_code_subtools.parameters.
 
 ### Other tools
 
 {{OTHER_TOOLS}}
 
-## Common tools SDK
+## Common tools JSON
 
-{{SDK}}
+The values below are plain JSON and use exactly the same entry shape as run_code_subtools.<tool>:
+
+{{COMMON_TOOLS_JSON}}
 
 ## Examples
 
