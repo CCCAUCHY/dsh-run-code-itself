@@ -1,6 +1,6 @@
 /**
- * Data-Code Separation for DSH PTC: preload the complete call and per-tool
- * templates, and expose the same executor under a neutral tool name.
+ * Data-Code Separation for DSH PTC: preload the complete call and every
+ * tool's input schema, without passing subtool arguments as JSON strings.
  * @module
  */
 import { readFileSync } from 'node:fs'
@@ -59,40 +59,14 @@ export function declarationFor(name, payload) {
   return 'const ' + name + ' = ' + jsonLiteral(payload) + ';'
 }
 
-/** Simple empty placeholder for a required JSON Schema property. */
-function emptyValue(property) {
-  if (Object.prototype.hasOwnProperty.call(property, 'const')) return property.const
-  switch (property.type) {
-    case 'string': return ''
-    case 'number': return 0
-    case 'integer': return 0
-    case 'boolean': return false
-    case 'array': return []
-    case 'object': return {}
-    default: return null
-  }
-}
-
-/** Build one { description, template } entry per visible tool. */
+/** Build one { description, signature, schema } entry per visible tool. */
 export function buildSubtools(definitions) {
   const subtools = Object.create(null)
   for (const definition of definitions) {
-    const parameters = isObjectRecord(definition.parameters) ? definition.parameters : {}
-    const properties = isObjectRecord(parameters.properties) ? parameters.properties : {}
-    const required = Array.isArray(parameters.required) ? parameters.required : []
-    const template = Object.create(null)
-    for (const key of required) {
-      const property = properties[key]
-      template[key] = isObjectRecord(property) ? emptyValue(property) : ''
-    }
-    for (const [key, property] of Object.entries(properties)) {
-      if (!isObjectRecord(property) || required.includes(key)) continue
-      if (Object.prototype.hasOwnProperty.call(property, 'default')) template[key] = property.default
-    }
     subtools[definition.name] = {
       description: definition.description === undefined ? '' : String(definition.description),
-      template,
       signature: signatureFor(definition),
+      schema: isObjectRecord(definition.parameters) ? definition.parameters : { type: 'object', properties: {} },
     }
   }
   return subtools
@@ -123,7 +97,7 @@ function signatureFor(definition) {
 
 /** Render compact lines for one tool group. */
 function renderToolLines(tools) {
-  return tools.map(tool => '- ' + signatureFor(tool) + ': ' + firstSentence(tool.description)).join('\n')
+  return tools.map(tool => '- ' + signatureFor(tool) + ': ' + firstSentence(docText(tool.description))).join('\n')
 }
 
 /** The complete system-prompt guide, loaded from prompts/guide.md. */
@@ -132,8 +106,8 @@ export function renderProgramGuide(tools, commonTools = DEFAULT_COMMON_TOOLS) {
   const common = tools.filter(tool => commonSet.has(tool.name))
   const other = tools.filter(tool => !commonSet.has(tool.name))
   return GUIDE_TEMPLATE
-    .replaceAll('{{COMMON_TOOLS}}', renderToolLines(common))
-    .replaceAll('{{OTHER_TOOLS}}', renderToolLines(other))
+    .replaceAll('{{COMMON_TOOLS}}', () => renderToolLines(common))
+    .replaceAll('{{OTHER_TOOLS}}', () => renderToolLines(other))
 }
 
 /** The run_code transport with the run_code alias and injected variables. */
@@ -207,7 +181,7 @@ export class RunCodeItselfExecutor extends PtcExecutor {
     }
   }
 
-  /** Inject the complete call and all templates before user code. */
+  /** Inject the complete call and every tool schema before user code. */
   async #execute(transport, args, exec) {
     if (!isObjectRecord(args) || typeof args.code !== 'string') return transport.execute(args, exec)
     const subtools = buildSubtools(this.ctx.tools.definitions(exec.agent, exec.toolSet))

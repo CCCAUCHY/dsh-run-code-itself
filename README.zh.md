@@ -5,7 +5,7 @@ DSH PTC 的 Data-Code Separation 插件。
 直接工具仍然是 run_code。每次调用预置两个变量：
 
 - run_code_itself：本次调用的完整参数，包括所有兄弟字段；
-- run_code_subtools：每个工具的描述、最小模板和紧凑签名。
+- run_code_subtools：每个工具的描述、紧凑签名和输入 schema。
 
 目标很简单：不要把数据写进 code 字符串。
 
@@ -20,9 +20,9 @@ DSH PTC 的 Data-Code Separation 插件。
 
     {"code":"return await tools.write(run_code_itself.write)","description":"写 SVG","write":{"file_path":"out.svg","content":"<svg>...</svg>"}}
 
-或者把模板写成一次完整调用：
+或者根据 schema 直接写一次调用：
 
-    {"code":"const args = run_code_subtools.bash.template; args.description = run_code_itself.label; args.command = run_code_itself.command; return await tools.bash(args)","description":"列文件","label":"列文件","command":"ls -la"}
+    {"code":"const s = run_code_subtools.write.schema; if (!s.required.every(k => k in run_code_itself.write)) throw new Error('missing write fields'); return (await tools.write(run_code_itself.write)).path","description":"写文件","write":{"file_path":"a.txt","content":"hi"}}
 
 数组与循环：
 
@@ -30,7 +30,7 @@ DSH PTC 的 Data-Code Separation 插件。
 
 run_code_subtools 是普通 JSON；所有可见工具都在里面，系统规范里也会列出全部工具的紧凑目录。可以用 Object.keys(run_code_subtools) 或打印某个条目。
 
-模板是结构骨架：必填字段给出简单空占位，有 schema 默认值的选填字段会带上默认值。复杂 enum、union、嵌套 required 的值不做猜测；在代码里填写，由工具 schema 校验。
+不再生成模板。run_code_subtools.<tool>.schema 是工具真实的输入 JSON Schema；直接在兄弟字段里构造参数对象，由工具 schema 校验。
 
 ## 系统规范与工具描述
 
@@ -66,7 +66,7 @@ persona 必须使用 complete: false；complete: true 会抑制系统规范段�
       name: '@deepseek-ai/dsh-persona'
       config:
         prefix: |
-          You are a helpful software engineer assistant. You MUST follow the run_code usage rules in the run_code tool description. Never inline subtool arguments. Use run_code_itself sibling fields or run_code_subtools templates, and return only JSON-safe values.
+          You are a helpful software engineer assistant. You MUST follow the run_code usage rules in the run_code tool description. Never inline subtool arguments. Put them as real JSON objects in run_code_itself sibling fields; inspect run_code_subtools.<tool>.schema when needed, and return only JSON-safe values.
         complete: false
         includeRuntimeContext: false
 
@@ -80,7 +80,7 @@ persona 必须使用 complete: false；complete: true 会抑制系统规范段�
 
     - Never inline tools.x({...}) inside run_code code.
     - Put data and every subtool argument in sibling fields of the call.
-    - Read run_code_itself or fill run_code_subtools templates; return only JSON-safe values.
+    - Read run_code_itself sibling fields; inspect run_code_subtools.<tool>.schema when needed; return only JSON-safe values.
     - If a value needs quotes, backslashes, or newlines, move it to a sibling field.
 
 仓库自己的 cordis.patch.yml 故意保持 []；不要把上面的 profile 配置复制进去。
@@ -123,7 +123,7 @@ profile 配置示例：
 
 ## 为什么工具名仍然是 run_code
 
-之前实验过把工具暴露为 program。三组独立 review 发现：插件层别名会破坏 DSH 的不变量——tool/call 日志、会话迁移、审批与 presentCall、knownNames/tool ordering 都绑定真实工具名。最终版本保留 run_code，把 Data-Code Separation 的投入放在变量、模板、系统规范和工具描述上。
+之前实验过把工具暴露为 program。三组独立 review 发现：插件层别名会破坏 DSH 的不变量——tool/call 日志、会话迁移、审批与 presentCall、knownNames/tool ordering 都绑定真实工具名。最终版本保留 run_code，把 Data-Code Separation 的投入放在变量、schema、系统规范和工具描述上。
 
 ## 行为与限制
 
@@ -136,7 +136,7 @@ profile 配置示例：
 
     DSH_PACKAGES_DIR=... node --experimental-loader ./test/loader.mjs ./test/run.mjs
 
-测试覆盖 schema、规范长度、模板、变量注入、特殊载荷、别名分发和 preset 挂载。
+测试覆盖 schema、规范长度、工具 schema、变量注入、特殊载荷、别名分发和 preset 挂载。
 
 固定提示词放在 prompts/ 下：guide.md 和 tool-description.txt；index.js 只负责加载和渲染，不再内联大段提示词。
 
