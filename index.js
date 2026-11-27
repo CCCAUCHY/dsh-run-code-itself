@@ -39,7 +39,6 @@ export const PROGRAM_TOOL = 'run_code'
 export const PROGRAM_ITSELF = 'run_code_itself'
 export const PROGRAM_SUBTOOLS = 'run_code_subtools'
 /** Fixed prompt data lives beside the code, not inside it. */
-const PTC_ONLY_TEXT = readFileSync(new URL('./prompts/ptc-only.txt', import.meta.url), 'utf8').trim()
 const TOOL_DESCRIPTION = readFileSync(new URL('./prompts/tool-description.txt', import.meta.url), 'utf8').trim()
 const GUIDE_TEMPLATE = readFileSync(new URL('./prompts/guide.md', import.meta.url), 'utf8').trim()
 
@@ -136,20 +135,12 @@ export class RunCodeItselfExecutor extends PtcExecutor {
       ...(maxParallelSubCalls === undefined ? {} : { maxParallelSubCalls }),
     })
     this.commonTools = Array.isArray(commonTools) ? commonTools : DEFAULT_COMMON_TOOLS
-    this.sections = [
-      {
-        name: 'tools:ptc-only',
-        order: ctx.systemPrompt.getSectionOrder('PTC_ONLY'),
-        text: PTC_ONLY_TEXT,
-        interpolate: false,
-      },
-      {
-        name: 'tools:sdk',
-        order: ctx.systemPrompt.getSectionOrder('TOOLS_SDK'),
-        text: tools => renderProgramGuide(tools, this.commonTools),
-        interpolate: false,
-      },
-    ]
+    this.sections = [{
+      name: 'tools:sdk',
+      order: ctx.systemPrompt.getSectionOrder('TOOLS_SDK'),
+      text: tools => renderProgramGuide(tools, this.commonTools),
+      interpolate: false,
+    }]
   }
 
   /** Wrap the reserved transport once. */

@@ -1,10 +1,10 @@
 ## Data-Code Separation
 
-This tool runs one program. code is logic only. Data is supplied in sibling fields of the call and read inside the program from run_code_itself.
+This tool runs one program. code is logic only. Data and tool arguments are supplied as sibling fields of the call and read inside the program from run_code_itself.
 
-1. **Never put literal data or escaping in code.** Put data in a sibling field and pass run_code_itself.<field>. Never write tools.x({...}).
-2. **Keep escaping out of code.** Any value that would need quotes, backslashes, newlines, JSON.stringify, or JSON.parse belongs in a sibling field.
-3. **Decide by actual escaping cost, not by type or size.** Simple control flow, loop bounds, flags, and short literals may stay in code.
+1. **Subtool JSON must live in sibling fields.** Each nested tool reads a real JSON object from run_code_itself.<field>. Never inline tools.x({...}) and never pass a tool argument as a JSON string.
+2. **Minimize escaping cost.** Put any value that would need quotes, backslashes, newlines, JSON.stringify, or JSON.parse in a sibling field; keep only control flow in code.
+3. **Write cohesive, low-coupling calls.** Keep one tool's complete argument object together in its own field. Do not split one call across unrelated fields or tie one tool's arguments to another tool's state.
 
 ## Program variables
 

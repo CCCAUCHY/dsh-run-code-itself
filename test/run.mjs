@@ -112,6 +112,9 @@ const webDefinition = { name: 'web_search', description: 'Search the web. Return
 
   const guide = plugin.renderProgramGuide([bashDefinition, readDefinition, webDefinition], ['bash'])
   assert.ok(guide.includes('## Data-Code Separation'))
+  assert.ok(guide.includes('**Subtool JSON must live in sibling fields.**'))
+  assert.ok(guide.includes('**Minimize escaping cost.**'))
+  assert.ok(guide.includes('**Write cohesive, low-coupling calls.**'))
   assert.ok(guide.includes('## Program variables'))
   assert.ok(guide.includes('## How to call a tool'))
   assert.ok(guide.includes('## Common tools'))
@@ -146,18 +149,16 @@ const webDefinition = { name: 'web_search', description: 'Search the web. Return
   assert.deepEqual(Object.keys(subtools.read).sort(), ['description', 'output', 'parameters'])
   console.log('tool metadata: every entry has original description, parameters, and output')
 
-  assert.equal(executor.sections.length, 2)
-  assert.equal(executor.sections[0].name, 'tools:ptc-only')
-  assert.ok(executor.sections[0].text.includes('sibling fields'))
-  assert.equal(executor.sections[1].name, 'tools:sdk')
+  assert.equal(executor.sections.length, 1)
+  assert.equal(executor.sections[0].name, 'tools:sdk')
   const { ctx: configuredCtx } = harness()
   const configuredExecutor = new plugin.RunCodeItselfExecutor(configuredCtx, { commonTools: ['bash'] })
-  const configuredGuide = configuredExecutor.sections[1].text([bashDefinition, readDefinition, webDefinition])
+  const configuredGuide = configuredExecutor.sections[0].text([bashDefinition, readDefinition, webDefinition])
   assert.ok(configuredGuide.includes('## Common tools'))
   assert.ok(configuredGuide.includes('- bash('))
   assert.ok(configuredGuide.includes('- read'))
   assert.ok(!configuredGuide.includes('declare const tools'))
-  console.log('sections: fixed sibling ptc-only + compact sdk')
+  console.log('sections: one compact sdk section; ptc-only removed')
 }
 
 // --- injection and run_code variables ---------------------------------------

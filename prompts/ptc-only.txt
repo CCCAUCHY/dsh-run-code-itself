@@ -1,1 +1,0 @@
-`run_code` is the only model-level tool call. Other tools are not model-level calls: pass their arguments through sibling fields of the `run_code` call and let the program invoke them.
