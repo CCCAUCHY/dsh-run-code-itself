@@ -134,6 +134,19 @@ profile 配置示例：
 - 小范围跨模型观察：OpenAI、Google 模型能按规范工作；DeepSeek-flash 在复杂任务下回退到内联。
 - 如果需要确定性拦截，应使用运行时 provenance 或无代码管道；本插件没有实现。
 
+## 最终状态：1.0 封版
+
+这是一个封版的实验版本，不是稳定的通用 PTC 执行器。
+
+目标是仅靠提示词让 Data-Code Separation 稳定生效。跨 DeepSeek V4.1 Flash 和更大模型的多次会话表明，瓶颈是模型能力，不是还缺一句提示词：
+
+- 相同的 system prompt 和 tool description 下，Flash 经常回退到 `tools.x({...})`；Kimi K3.1 Pro 能遵守 sibling 字段规则。
+- 同一个 Flash 模型，在相似提示词下，一次会话遵守，另一次不遵守。
+- 强到能遵守脚手架的模型不需要它；弱到需要它的模型又无法稳定遵守。
+- 继续增加规则只会增加上下文竞争和波动，无法让行为确定。
+
+1.0 保留最干净的紧凑提示词和完整的 `run_code_subtools` metadata。它适合作为参考、给强模型使用，或等待未来模型；Flash 类模型建议使用原生 PTC 或原生工具。不再计划纯提示词改动。如果以后还要继续，可信的方向是运行时硬拦截、无代码管道或 hybrid 执行器，而不是再改提示词。
+
 ## 开发
 
     DSH_PACKAGES_DIR=... node --experimental-loader ./test/loader.mjs ./test/run.mjs

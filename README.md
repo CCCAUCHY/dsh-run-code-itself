@@ -134,6 +134,19 @@ A previous experimental version exposed the tool as program. Three independent r
 - A small cross-model check showed OpenAI and Google models following the guide; a DeepSeek-flash route reverted to inline calls on complex tasks.
 - If deterministic enforcement is required, use runtime provenance or a no-code pipeline; neither is implemented here.
 
+## Final status: 1.0 sealed
+
+This is a sealed experimental release, not a stable general-purpose PTC executor.
+
+The goal was to make Data-Code Separation reliable with prompt-only scaffolding. Repeated sessions across DeepSeek V4.1 Flash and larger models showed that the limiter is model capability, not a missing prompt phrase:
+
+- With the same system prompt and tool description, Flash often falls back to `tools.x({...})`; Kimi K3.1 Pro followed the sibling-field rule.
+- The same Flash model, with a similar prompt, followed in one session and did not in another.
+- Models strong enough to follow the scaffold do not need it; models weak enough to need it do not follow it reliably.
+- More prompt rules add context competition and increase variance instead of making the behavior deterministic.
+
+1.0 keeps the cleanest compact prompt and the full `run_code_subtools` metadata. It is intended for reference, strong models, and future models; for Flash-like models use stock PTC or native tools. No further prompt-only change is planned. If this problem returns, the credible next steps are a hard runtime guard, a no-code pipeline, or a hybrid executor — not another prompt revision.
+
 ## Development
 
     DSH_PACKAGES_DIR=... node --experimental-loader ./test/loader.mjs ./test/run.mjs
